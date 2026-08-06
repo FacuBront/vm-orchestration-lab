@@ -1,0 +1,484 @@
+{
+  "name": "VM Pipeline - Lab Apache",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c01d3164-f33c-4276-a726-bd5cf5d6b316",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "command": "nmap -sV -oX - target1"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b66175be-6abd-43a7-87fa-3403a37e3618",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 3 — Parseo del XML de Nmap.\n// Fix de hallazgos del dictamen: try/catch real, parseStringPromise\n// (async, no callback), encadenamiento opcional en todo acceso a campos\n// que pueden no existir (evita que un host \"raro\" tire abajo el nodo).\n// v2: agrega los timestamps reales del escaneo (tomados del propio XML\n// de Nmap, no de la hora de ejecución de n8n).\n\nconst { parseStringPromise } = require('xml2js');\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const rawXml = item.json.stdout;\n\n  if (!rawXml) {\n    throw new Error('El item no contiene stdout con el XML de Nmap. Verificar el nodo Execute Command anterior.');\n  }\n\n  let parsed;\n  try {\n    parsed = await parseStringPromise(rawXml, { explicitArray: true });\n  } catch (err) {\n    results.push({\n      json: {\n        parseError: true,\n        errorMessage: err.message,\n        rawXmlSnippet: rawXml.slice(0, 200),\n      },\n    });\n    continue;\n  }\n\n  // Timestamps reales del escaneo, tomados del propio Nmap (epoch en\n  // segundos -> ISO 8601 para que Postgres los acepte sin conversión).\n  const startEpoch = parsed?.nmaprun?.$?.start ?? null;\n  const endEpoch = parsed?.nmaprun?.runstats?.[0]?.finished?.[0]?.$?.time ?? null;\n  const scanStartedAt = startEpoch ? new Date(Number(startEpoch) * 1000).toISOString() : null;\n  const scanFinishedAt = endEpoch ? new Date(Number(endEpoch) * 1000).toISOString() : null;\n\n  const hosts = parsed?.nmaprun?.host ?? [];\n\n  for (const host of hosts) {\n    const address = host?.address?.[0]?.$?.addr ?? 'unknown';\n    const hostname = host?.hostnames?.[0]?.hostname?.[0]?.$?.name ?? null;\n    const hostStatus = host?.status?.[0]?.$?.state ?? 'unknown';\n    const ports = host?.ports?.[0]?.port ?? [];\n\n    if (ports.length === 0) {\n      results.push({\n        json: {\n          parseError: false,\n          hostIp: address,\n          hostname,\n          hostStatus,\n          port: null,\n          protocol: null,\n          serviceName: null,\n          serviceProduct: null,\n          serviceVersion: null,\n          scanStartedAt,\n          scanFinishedAt,\n        },\n      });\n      continue;\n    }\n\n    for (const port of ports) {\n      const service = port?.service?.[0]?.$ ?? {};\n      results.push({\n        json: {\n          parseError: false,\n          hostIp: address,\n          hostname,\n          hostStatus,\n          port: port?.$?.portid ?? null,\n          protocol: port?.$?.protocol ?? null,\n          portState: port?.state?.[0]?.$?.state ?? 'unknown',\n          serviceName: service.name ?? null,\n          serviceProduct: service.product ?? null,\n          serviceVersion: service.version ?? null,\n          serviceExtraInfo: service.extrainfo ?? null,\n          scanStartedAt,\n          scanFinishedAt,\n        },\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "b3536098-2727-442b-8bfb-5972b62e5b2f",
+      "name": "Parsear XML Nmap"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 4 — Preparar resumen para scan_history.\n// Corre una sola vez sobre TODOS los items que produjo el Nodo 3 (parseo),\n// y arma un único registro-resumen del escaneo completo.\n\nconst crypto = require('crypto');\n\nconst items = $input.all();\n\nif (items.length === 0) {\n  throw new Error('No hay items de entrada: el escaneo no produjo ningún resultado.');\n}\n\n// Todos los items de una misma corrida comparten los mismos timestamps de\n// escaneo (vienen del mismo XML de Nmap), así que tomamos el primero.\nconst scanStartedAt = items[0].json.scanStartedAt;\nconst scanFinishedAt = items[0].json.scanFinishedAt;\n\n// Hosts únicos detectados (por si en el futuro escaneamos un rango con\n// varios hosts, no solo target1).\nconst uniqueHosts = new Set(items.map((i) => i.json.hostIp).filter(Boolean));\n\nreturn [\n  {\n    json: {\n      scanUuid: crypto.randomUUID(),\n      targetRange: Array.from(uniqueHosts).join(', '),\n      startedAt: scanStartedAt,\n      finishedAt: scanFinishedAt,\n      hostCount: uniqueHosts.size,\n      findingCount: items.length,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "5ee3bdcf-aaf5-4e80-b7b9-4ca6063ebfc9",
+      "name": "Resumen Scan History"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO scan_history (scan_uuid, target_range, started_at, finished_at, host_count, finding_count, status)\nVALUES ($1, $2, $3, $4, $5, $6, 'completed')\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.scanUuid }}, {{ $json.targetRange }}, {{ $json.startedAt }}, {{ $json.finishedAt }}, {{ $json.hostCount }}, {{ $json.findingCount }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        0
+      ],
+      "id": "8fc4c1bc-5b1a-4f5e-abe3-a5936af81015",
+      "name": "Insert Scan History",
+      "credentials": {
+        "postgres": {
+          "id": "JDnPL1XNQO79HJN0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 6 — Adjuntar el scan_id (generado en el Nodo 5 / \"Insert Scan\n// History\") a cada hallazgo individual, antes de insertarlos en\n// vulnerability_scans.\n//\n// Fix directo del hallazgo C-06 del dictamen: en la tesis anterior, un\n// nodo generaba un taskId que ningún nodo posterior capturaba\n// explícitamente, rompiendo la cadena de datos. Acá el ID se recupera\n// por nombre de nodo (mecanismo nativo de n8n, no un objeto inventado) y\n// se propaga a cada item sin pérdida.\n\nconst scanId = $('Insert Scan History').first().json.id;\nconst findings = $('Parsear XML Nmap').all();\n\nif (scanId === undefined || scanId === null) {\n  throw new Error('No se pudo obtener el scan_id del nodo \"Insert Scan History\".');\n}\n\nreturn findings.map((item) => ({\n  json: {\n    ...item.json,\n    scanId,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "172a7a66-4656-45c7-b0ff-7b988367fd25",
+      "name": "Adjuntar Scan Id"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "vulnerability_scans",
+          "mode": "list",
+          "cachedResultName": "vulnerability_scans"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "severity_score": 0,
+            "service_version": "={{ $json.serviceProduct }} {{ $json.serviceVersion }}{{ $json.serviceExtraInfo ? ' (' + $json.serviceExtraInfo + ')' : '' }}",
+            "service_name": "={{ $json.serviceName }}",
+            "protocol": "={{ $json.protocol }}",
+            "port": "={{ $json.port }}",
+            "hostname": "={{ $json.hostname }}",
+            "host_ip": "={{ $json.hostIp }}",
+            "scan_id": "={{ $json.scanId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "scan_id",
+              "displayName": "scan_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "host_ip",
+              "displayName": "host_ip",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hostname",
+              "displayName": "hostname",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "port",
+              "displayName": "port",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "protocol",
+              "displayName": "protocol",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_name",
+              "displayName": "service_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_version",
+              "displayName": "service_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cve_id",
+              "displayName": "cve_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity_score",
+              "displayName": "severity_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity_label",
+              "displayName": "severity_label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detected_at",
+              "displayName": "detected_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "ffe7c853-3537-4c25-b45b-0a3d25f7777a",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "JDnPL1XNQO79HJN0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reduce a un único item antes de la consulta SELECT, para que el nodo\n// Postgres siguiente ejecute la query una sola vez (no una vez por fila\n// insertada).\nreturn [{ json: { scanId: $input.first().json.scan_id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        0
+      ],
+      "id": "27af88dd-f8ba-408a-b56d-e8892023a57f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM vulnerability_scans WHERE scan_id = $1 ORDER BY id;",
+        "options": {
+          "queryReplacement": "={{ $json.scanId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "b0acdf3c-a301-4ff0-b426-5e7b9e05036b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "JDnPL1XNQO79HJN0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 8 — Generador del informe Markdown.\n//\n// Fix directo de C-07 y C-08 del dictamen: este código recorre el 100%\n// de las filas devueltas por la consulta a PostgreSQL (sin ningún límite\n// arbitrario tipo \"renderVulns(high, 5)\"), e incluye el inventario de\n// hosts que la tesis anterior prometía en el objetivo 6 pero el código\n// nunca generaba.\n//\n// Nota metodológica (documentar en la tesis): como GVM todavía no está\n// integrado (Fase 2d, pendiente de hardware), estos son hallazgos de\n// RECONOCIMIENTO de Nmap (servicio + versión), no vulnerabilidades con\n// CVE confirmado. El informe lo declara así explícitamente para no\n// sobrerrepresentar el resultado. Cuando GVM esté disponible, las mismas\n// columnas (cve_id, severity_label, description, solution) se van a\n// poblar y este mismo código las va a mostrar sin cambiar una línea.\n\nconst findings = $input.all().map((item) => item.json);\nconst summary = $('Resumen Scan History').first().json;\n\nif (findings.length === 0) {\n  throw new Error('No se recibieron hallazgos desde la consulta a PostgreSQL. Verificar el nodo anterior.');\n}\n\n// --- Inventario de hosts (fix C-08: nunca implementado en la tesis anterior) ---\nconst hostMap = new Map();\nfor (const f of findings) {\n  if (!hostMap.has(f.host_ip)) {\n    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: [] });\n  }\n  const entry = hostMap.get(f.host_ip);\n  entry.count += 1;\n  entry.ports.push(f.port);\n}\n\nlet hostInventory = '| Host (IP) | Hostname | Puertos detectados | Cant. hallazgos |\\n';\nhostInventory += '|---|---|---|---|\\n';\nfor (const [ip, data] of hostMap.entries()) {\n  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${data.ports.join(', ')} | ${data.count} |\\n`;\n}\n\n// --- Agrupación por severidad (si GVM ya la completó) o por servicio\n// (mientras tanto, con datos de reconocimiento de Nmap) ---\nconst hasSeverityData = findings.some((f) => f.severity_label);\n\nlet detailSection = '';\nif (hasSeverityData) {\n  const bySeverity = { Critical: [], High: [], Medium: [], Low: [], Unknown: [] };\n  for (const f of findings) {\n    const label = f.severity_label ?? 'Unknown';\n    (bySeverity[label] ?? bySeverity.Unknown).push(f);\n  }\n  for (const [label, items] of Object.entries(bySeverity)) {\n    if (items.length === 0) continue;\n    detailSection += `\\n### ${label} (${items.length})\\n\\n`;\n    for (const f of items) {\n      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name} (${f.service_version})\\n`;\n      if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\\n`;\n      if (f.description) detailSection += `  - Descripción: ${f.description}\\n`;\n      if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\\n`;\n    }\n  }\n} else {\n  detailSection += `\\n### Hallazgos de reconocimiento (Nmap) — pendientes de correlación con GVM\\n\\n`;\n  detailSection += `> Estos ${findings.length} hallazgos provienen de la detección de servicios y versiones de Nmap. `;\n  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone, Fase 2d del proyecto). `;\n  detailSection += `No deben interpretarse como vulnerabilidades confirmadas.\\n\\n`;\n  for (const f of findings) {\n    detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name}: ${f.service_version}\\n`;\n  }\n}\n\n// --- Recomendaciones generales (fix C-08) ---\nconst recommendations = [\n  'Correlacionar estos hallazgos con una base de datos de CVE (GVM/Greenbone) antes de tomar acciones de remediación.',\n  'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',\n  'Restringir el acceso de red a los puertos detectados únicamente a los hosts que efectivamente lo necesiten.',\n  'Repetir este escaneo de forma periódica para detectar desviaciones respecto de esta línea base.',\n];\n\nconst report = `# Informe de Escaneo de Red\n\n**ID de escaneo:** ${summary.scanUuid}\n**Rango/objetivo:** ${summary.targetRange}\n**Inicio:** ${summary.startedAt}\n**Fin:** ${summary.finishedAt}\n**Hosts analizados:** ${summary.hostCount}\n**Hallazgos totales:** ${findings.length} de ${findings.length} recuperados de la base de datos (correspondencia 1:1 verificada)\n\n## Inventario de hosts\n\n${hostInventory}\n\n## Detalle de hallazgos\n${detailSection}\n\n## Recomendaciones generales\n\n${recommendations.map((r) => `- ${r}`).join('\\n')}\n\n---\n*Informe generado automáticamente. Fuente de datos: tabla \\`vulnerability_scans\\`, scan_id = ${findings[0].scan_id}.*\n`;\n\nreturn [{ json: { reportMarkdown: report, findingCount: findings.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        0
+      ],
+      "id": "5ea90c52-886d-48af-8703-a57a66cd9901",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/n8n/.n8n-files/informe_{{ $now.format('yyyy-MM-dd_HH-mm-ss') }}.md",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        0
+      ],
+      "id": "3278acbb-5253-4d43-8514-12f4e666b937",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "reportMarkdown",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2176,
+        0
+      ],
+      "id": "aef00d9f-bf92-4e17-b6fe-9b47131df965",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Parsear XML Nmap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear XML Nmap": {
+      "main": [
+        [
+          {
+            "node": "Resumen Scan History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen Scan History": {
+      "main": [
+        [
+          {
+            "node": "Insert Scan History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Scan History": {
+      "main": [
+        [
+          {
+            "node": "Adjuntar Scan Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjuntar Scan Id": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "986c314a-45be-4f6e-a4fe-6e065ef84a57",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e5da8a018e57a9543cc995048c683ccf25263ac6ec01fb533d166839695e3e46"
+  },
+  "id": "6kBPuCFcuegnxlIq",
+  "tags": []
+}

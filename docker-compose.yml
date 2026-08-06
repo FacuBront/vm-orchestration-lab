@@ -1,0 +1,136 @@
+# -----------------------------------------------------------------------------
+# Laboratorio de Orquestación de Gestión de Vulnerabilidades - Fase 2b
+#
+# Estado actual: n8n (con Nmap embebido) + PostgreSQL. El contenedor
+# objetivo de prueba se agrega en el próximo paso (Fase 2c).
+# GVM/Greenbone queda pendiente hasta contar con una máquina con RAM
+# suficiente (ver Fase 2d en el plan de trabajo).
+# -----------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab_postgres
+    restart: unless-stopped
+    environment:
+      # El "usuario" y "contraseña" que arrancan el contenedor son el
+      # SUPERUSUARIO, usado solo por los scripts de inicialización en
+      # sql/init/. n8n va a conectarse con POSTGRES_APP_USER, creado por
+      # 02_app_user.sh con permisos restringidos (ver ese archivo).
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_SUPERUSER}
+      - POSTGRES_PASSWORD=${POSTGRES_SUPERUSER_PASSWORD}
+      # Variables propias (no reservadas por la imagen de postgres) que
+      # los scripts de sql/init/ leen para crear el usuario restringido.
+      - POSTGRES_SUPERUSER=${POSTGRES_SUPERUSER}
+      - POSTGRES_APP_USER=${POSTGRES_APP_USER}
+      - POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Los scripts acá se ejecutan UNA SOLA VEZ, la primera vez que el
+      # volumen de datos está vacío. Si necesitás re-ejecutarlos, hay que
+      # borrar el volumen (docker compose down -v).
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      labnet:
+        ipv4_address: 172.28.0.11
+    healthcheck:
+      # n8n va a depender de este healthcheck: no tiene sentido que arranque
+      # a intentar conectarse a una base de datos que todavía se está
+      # inicializando.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    build:
+      context: .
+      dockerfile: n8n.Dockerfile
+    container_name: lab_n8n
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5678:5678"
+    environment:
+      # --- Fix directo a C-05 del dictamen ---
+      # Sin estas dos variables, n8n bloquea require('xml2js'), require('fs'),
+      # etc. dentro de los nodos Code, y el pipeline entero queda inutilizable.
+      - NODE_FUNCTION_ALLOW_EXTERNAL=xml2js,axios,https,fs
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+
+      # --- Fix a hallazgo descubierto en vivo (documentar en la tesis) ---
+      # n8n v2 deshabilita por defecto dos nodos por riesgo de RCE (ejecución
+      # remota de código): "executeCommand" y "localFileTrigger". Se
+      # verificó leyendo el código fuente instalado
+      # (@n8n/config/dist/configs/nodes.config.js): el valor por defecto de
+      # NODES_EXCLUDE es ['n8n-nodes-base.executeCommand',
+      # 'n8n-nodes-base.localFileTrigger']. Reactivamos SOLO el que
+      # necesitamos (executeCommand, para correr Nmap) y dejamos
+      # localFileTrigger deshabilitado -no lo usamos, y no hay motivo para
+      # reabrir una puerta que no necesitamos-.
+      - NODES_EXCLUDE=["n8n-nodes-base.localFileTrigger"]
+
+      # Zona horaria para que los timestamps de las ejecuciones (importantes
+      # para el capítulo de Resultados) sean legibles y correctos.
+      - GENERIC_TIMEZONE=America/Argentina/Mendoza
+      - TZ=America/Argentina/Mendoza
+    volumes:
+      # Persistencia de los workflows, credenciales y configuración de n8n
+      # entre reinicios del contenedor. Ruta ajustada a /home/n8n/.n8n
+      # porque el Dockerfile v2 crea un usuario propio "n8n" (ver
+      # n8n.Dockerfile), no el usuario "node" de la imagen oficial.
+      - n8n_data:/home/n8n/.n8n
+      # Fix a un hallazgo puntual del dictamen: el informe generado por
+      # el Nodo 8 ya NO se escribe en /tmp del contenedor (se perdía al
+      # recrearlo). Bind mount a una carpeta real del proyecto.
+      #
+      # NOTA TÉCNICA (documentar en la tesis): se descubrió en vivo que
+      # n8n v2 restringe por defecto los nodos de archivo a escribir
+      # únicamente dentro de ~/.n8n-files (variable de entorno
+      # N8N_RESTRICT_FILE_ACCESS_TO, verificado en
+      # @n8n/config/dist/configs/security.config.js). En vez de aflojar
+      # esa restricción de seguridad con una variable adicional, se optó
+      # por montar el volumen directamente en la carpeta que n8n ya
+      # permite por defecto -principio de mínimo privilegio-.
+      - ./reports:/home/n8n/.n8n-files
+    cap_add:
+      # Nmap necesita estas capabilities para ciertos tipos de escaneo
+      # (p. ej. -sS SYN scan, -O detección de SO) que requieren construir
+      # paquetes crudos a nivel de red. Sin esto, Nmap corre muy limitado
+      # dentro del contenedor.
+      - NET_RAW
+      - NET_ADMIN
+    networks:
+      labnet:
+        ipv4_address: 172.28.0.10
+
+  target1:
+    # Contenedor objetivo construido por nosotros (ver target1.Dockerfile
+    # para la justificación completa: la imagen comunitaria original,
+    # citizenstig/metasploitable2, fue retirada de Docker Hub). Corre
+    # Ubuntu 16.04 con SSH, FTP y Apache en sus versiones originales de
+    # esa distribución, ya EOL. Solo existe dentro de "labnet": no se
+    # expone ningún puerto al host, por lo que es inalcanzable desde
+    # fuera de la red aislada del laboratorio.
+    build:
+      context: .
+      dockerfile: target1.Dockerfile
+    container_name: lab_target1
+    restart: unless-stopped
+    networks:
+      labnet:
+        ipv4_address: 172.28.0.20
+
+networks:
+  labnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  n8n_data:
+  postgres_data:

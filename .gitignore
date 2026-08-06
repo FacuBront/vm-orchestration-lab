@@ -1,0 +1,12 @@
+# Credenciales reales — NUNCA se suben al repositorio.
+# Se documenta .env.example como plantilla para que cualquiera pueda
+# reproducir el laboratorio sin exponer contraseñas reales.
+.env
+
+# Datos persistentes de los contenedores (no son código, no van al repo).
+postgres_data/
+n8n_data/
+
+# Artefactos de scans reales que puedan contener información sensible del
+# entorno de laboratorio: se suben de forma curada a /evidencia, no acá.
+*.log

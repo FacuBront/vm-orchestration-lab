@@ -44,10 +44,18 @@ const hasSeverityData = findings.some((f) => f.severity_label);
 
 let detailSection = '';
 if (hasSeverityData) {
-  const bySeverity = { Critical: [], High: [], Medium: [], Low: [], Unknown: [] };
+  // Etiquetas en español, consistentes con la columna severity_label del
+  // esquema (sql/init/01_schema.sql: "Crítica | Alta | Media | Baja | Ninguna")
+  // y con lo que produce workflow-nodes/nodo-gvm-parseo-mock.js. Se encontró
+  // y corrigió una inconsistencia real: esta versión anterior usaba etiquetas
+  // en inglés (Critical/High/Medium/Low), que nunca iban a coincidir con los
+  // datos reales — el mismo tipo de inconsistencia terminológica (OMP/GMP)
+  // que señaló el dictamen de auditoría, detectada acá antes de que llegara
+  // a la tesis.
+  const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };
   for (const f of findings) {
-    const label = f.severity_label ?? 'Unknown';
-    (bySeverity[label] ?? bySeverity.Unknown).push(f);
+    const label = f.severity_label ?? 'Ninguna';
+    (bySeverity[label] ?? bySeverity.Ninguna).push(f);
   }
   for (const [label, items] of Object.entries(bySeverity)) {
     if (items.length === 0) continue;

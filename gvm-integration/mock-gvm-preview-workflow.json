@@ -1,0 +1,179 @@
+{
+  "name": "MOCK - GVM Preview",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b684c319-37a6-4355-b406-d84d55b35af9",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "command": "=cat /home/n8n/.n8n-files/_mock-get-reports-response.xml"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "aa87e629-dd28-4877-ba6a-305e4ea1a086",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo de parseo GVM/GMP — VERSIÓN DE PREPARACIÓN CON DATOS SIMULADOS.\n//\n// Contexto: GVM todavía no está instalado (Fase 2d, bloqueada por RAM insuficiente\n// en la notebook de desarrollo). Este nodo se construyó y probó contra\n// gvm-integration/mock-get-reports-response.xml, un XML simulado pero basado en\n// CVEs reales aplicables a las versiones detectadas en target1 (ver ese archivo\n// para el detalle y las fuentes consultadas).\n//\n// Cuando GVM esté disponible: el nodo \"Execute Command\" anterior a este va a\n// invocar `gvm-cli` de verdad en vez de `cat gvm-integration/mock-...xml`, y este\n// código de parseo NO debería necesitar cambios (mismo formato de entrada\n// esperado). Verificar igual contra la respuesta real la primera vez.\n//\n// Decisión de diseño: los hallazgos de GVM NO se insertan como filas nuevas.\n// Se usan para ACTUALIZAR (UPDATE) las filas que el pipeline de Nmap ya insertó\n// en vulnerability_scans (cruzando por host_ip + port), completando cve_id,\n// severity_score, severity_label, description y solution. Resultado: una sola\n// fila por hallazgo real, enriquecida en dos pasadas (reconocimiento -> CVE),\n// no filas duplicadas. Este nodo prepara esos datos; el UPDATE en sí lo hace el\n// nodo Postgres siguiente (fuera del alcance de esta preparación).\n\nconst { parseStringPromise } = require('xml2js');\n\n// Traducción de los niveles de threat de GMP a las etiquetas en español que\n// usa nuestro esquema (columna severity_label: Crítica | Alta | Media | Baja | Ninguna).\nconst THREAT_TO_LABEL = {\n  Critical: 'Crítica',\n  High: 'Alta',\n  Medium: 'Media',\n  Low: 'Baja',\n  Log: 'Ninguna',\n  Debug: 'Ninguna',\n};\n\nfunction extraerTag(tagsString, clave) {\n  // El campo \"tags\" de un NVT viene como pares clave=valor separados por \"|\",\n  // ej: \"summary=...|insight=...|solution=...\". Convención documentada por\n  // Greenbone; no hay subelementos separados para cada una en get_reports.\n  if (!tagsString) return null;\n  const partes = tagsString.split('|');\n  for (const parte of partes) {\n    const idx = parte.indexOf('=');\n    if (idx === -1) continue;\n    const k = parte.slice(0, idx).trim();\n    const v = parte.slice(idx + 1).trim();\n    if (k === clave) return v || null;\n  }\n  return null;\n}\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const rawXml = item.json.stdout;\n\n  if (!rawXml) {\n    throw new Error('El item no contiene stdout con el XML de get_reports. Verificar el nodo Execute Command anterior.');\n  }\n\n  let parsed;\n  try {\n    parsed = await parseStringPromise(rawXml, { explicitArray: true });\n  } catch (err) {\n    results.push({\n      json: {\n        parseError: true,\n        errorMessage: err.message,\n        rawXmlSnippet: rawXml.slice(0, 200),\n      },\n    });\n    continue;\n  }\n\n  const reportResults =\n    parsed?.get_reports_response?.report?.[0]?.report?.[0]?.results?.[0]?.result ?? [];\n\n  if (reportResults.length === 0) {\n    results.push({\n      json: {\n        parseError: false,\n        noFindings: true,\n        message: 'get_reports no devolvió resultados (0 hallazgos).',\n      },\n    });\n    continue;\n  }\n\n  for (const r of reportResults) {\n    const hostIp = r?.host?.[0] ?? null;\n    const portRaw = r?.port?.[0] ?? null; // formato \"80/tcp\"\n    const [portNum, protocol] = portRaw ? portRaw.split('/') : [null, null];\n\n    const nvt = r?.nvt?.[0] ?? {};\n    const cve = nvt?.cve?.[0] ?? null;\n    const tags = nvt?.tags?.[0] ?? null;\n\n    const threat = r?.threat?.[0] ?? 'Log';\n    const severityScore = Number(r?.severity?.[0] ?? 0);\n\n    results.push({\n      json: {\n        parseError: false,\n        hostIp,\n        port: portNum ? Number(portNum) : null,\n        protocol: protocol ?? null,\n        cveId: cve && cve !== 'NOCVE' ? cve : null,\n        severityScore,\n        severityLabel: THREAT_TO_LABEL[threat] ?? 'Ninguna',\n        description: extraerTag(tags, 'summary') ?? r?.description?.[0] ?? null,\n        solution: extraerTag(tags, 'solution') ?? null,\n      },\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "06dd78bf-37b5-4db9-a7ad-78f84723340d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo \"Adaptar Mock + Resumen\" — SOLO para el workflow de preview\n// \"MOCK - GVM Preview\". NO se usa en el workflow real ni toca PostgreSQL.\n//\n// Hace dos cosas en un solo paso, para simplificar el workflow de preview:\n// 1. Convierte los campos camelCase que produce nodo-gvm-parseo-mock.js\n//    (hostIp, cveId, severityScore...) al snake_case que espera\n//    nodo8-generar-informe.js (host_ip, cve_id...), porque ese nodo fue\n//    diseñado para leer filas tal cual las devuelve una consulta SQL.\n// 2. Arma el objeto \"summary\" (scanUuid, targetRange, etc.) en memoria,\n//    sin ningún INSERT real.\n//\n// La tabla PORT_A_SERVICIO es una comodidad SOLO para este preview: en el\n// pipeline real, service_name/service_version ya vienen guardados en\n// vulnerability_scans desde el paso de Nmap (no hace falta inventarlos).\n\nconst crypto = require('crypto');\n\nconst PORT_A_SERVICIO = {\n  21: { service_name: 'ftp', service_version: 'vsftpd 3.0.3' },\n  22: { service_name: 'ssh', service_version: 'OpenSSH 7.6p1 Ubuntu 4ubuntu0.7' },\n  80: { service_name: 'http', service_version: 'Apache httpd 2.4.29 ((Ubuntu))' },\n};\n\nconst itemsGvm = $input.all();\n\nif (itemsGvm.length === 0) {\n  throw new Error('No hay items de entrada: el mock de GVM no produjo ningún resultado.');\n}\n\nconst findingsAdaptados = itemsGvm.map((item) => {\n  const j = item.json;\n  const servicio = PORT_A_SERVICIO[j.port] ?? { service_name: null, service_version: null };\n  return {\n    scan_id: 'MOCK-PREVIEW',\n    host_ip: j.hostIp,\n    hostname: 'target1',\n    port: j.port,\n    protocol: j.protocol,\n    service_name: servicio.service_name,\n    service_version: servicio.service_version,\n    cve_id: j.cveId,\n    severity_score: j.severityScore,\n    severity_label: j.severityLabel,\n    description: j.description,\n    solution: j.solution,\n  };\n});\n\nconst uniqueHosts = new Set(findingsAdaptados.map((f) => f.host_ip).filter(Boolean));\n\n// Guardamos el resumen y los hallazgos en el mismo item (índice 0) para que\n// el siguiente nodo (una copia de nodo8-generar-informe.js) pueda leer todo\n// sin depender de $('Resumen Scan History'), que no existe en este preview.\nreturn [\n  {\n    json: {\n      summary: {\n        scanUuid: 'MOCK-PREVIEW-' + crypto.randomUUID(),\n        targetRange: Array.from(uniqueHosts).join(', '),\n        startedAt: new Date().toISOString(),\n        finishedAt: new Date().toISOString(),\n        hostCount: uniqueHosts.size,\n        findingCount: findingsAdaptados.length,\n      },\n      findings: findingsAdaptados,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "02dca17e-106d-4b87-b088-fc25d17c0ea2",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 8 — Generador del informe Markdown — VERSIÓN PREVIEW.\n//\n// Copia funcionalmente idéntica a nodo8-generar-informe.js. La ÚNICA\n// diferencia son las dos primeras líneas: en el pipeline real, findings y\n// summary vienen de PostgreSQL (vía $input y $('Resumen Scan History'));\n// acá vienen del nodo \"Adaptar Mock + Resumen\" anterior, todo en memoria.\n// Si el pipeline real cambia esta lógica de armado del informe, hay que\n// replicar el cambio acá también (o, mejor, borrar este preview cuando ya\n// no haga falta).\n\nconst entrada = $input.first().json;\nconst findings = entrada.findings;\nconst summary = entrada.summary;\n\nif (findings.length === 0) {\n  throw new Error('No se recibieron hallazgos del nodo \"Adaptar Mock + Resumen\".');\n}\n\n// --- Inventario de hosts ---\nconst hostMap = new Map();\nfor (const f of findings) {\n  if (!hostMap.has(f.host_ip)) {\n    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: [] });\n  }\n  const entry = hostMap.get(f.host_ip);\n  entry.count += 1;\n  entry.ports.push(f.port);\n}\n\nlet hostInventory = '| Host (IP) | Hostname | Puertos detectados | Cant. hallazgos |\\n';\nhostInventory += '|---|---|---|---|\\n';\nfor (const [ip, data] of hostMap.entries()) {\n  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${data.ports.join(', ')} | ${data.count} |\\n`;\n}\n\n// --- Agrupación por severidad ---\nconst hasSeverityData = findings.some((f) => f.severity_label);\n\nlet detailSection = '';\nif (hasSeverityData) {\n  const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };\n  for (const f of findings) {\n    const label = f.severity_label ?? 'Ninguna';\n    (bySeverity[label] ?? bySeverity.Ninguna).push(f);\n  }\n  for (const [label, items] of Object.entries(bySeverity)) {\n    if (items.length === 0) continue;\n    detailSection += `\\n### ${label} (${items.length})\\n\\n`;\n    for (const f of items) {\n      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name} (${f.service_version})\\n`;\n      if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\\n`;\n      if (f.description) detailSection += `  - Descripción: ${f.description}\\n`;\n      if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\\n`;\n    }\n  }\n} else {\n  detailSection += `\\n### Hallazgos de reconocimiento (Nmap) — pendientes de correlación con GVM\\n\\n`;\n  detailSection += `> Estos ${findings.length} hallazgos provienen de la detección de servicios y versiones de Nmap. `;\n  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone, Fase 2d del proyecto). `;\n  detailSection += `No deben interpretarse como vulnerabilidades confirmadas.\\n\\n`;\n  for (const f of findings) {\n    detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name}: ${f.service_version}\\n`;\n  }\n}\n\n// --- Recomendaciones generales ---\nconst recommendations = [\n  'Correlacionar estos hallazgos con una base de datos de CVE (GVM/Greenbone) antes de tomar acciones de remediación.',\n  'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',\n  'Restringir el acceso de red a los puertos detectados únicamente a los hosts que efectivamente lo necesiten.',\n  'Repetir este escaneo de forma periódica para detectar desviaciones respecto de esta línea base.',\n];\n\nconst report = `# [PREVIEW - DATOS SIMULADOS, NO REALES] Informe de Escaneo de Red\n\n> ⚠️ Este informe se generó con datos de GVM SIMULADOS (ver gvm-integration/README.md).\n> No representa un escaneo real. Sirve para validar que el pipeline completo\n> (parseo -> agrupación por severidad -> informe) funciona antes de tener GVM instalado.\n\n**ID de escaneo:** ${summary.scanUuid}\n**Rango/objetivo:** ${summary.targetRange}\n**Inicio:** ${summary.startedAt}\n**Fin:** ${summary.finishedAt}\n**Hosts analizados:** ${summary.hostCount}\n**Hallazgos totales:** ${findings.length} de ${findings.length} recuperados (correspondencia 1:1 verificada)\n\n## Inventario de hosts\n\n${hostInventory}\n\n## Detalle de hallazgos\n${detailSection}\n\n## Recomendaciones generales\n\n${recommendations.map((r) => `- ${r}`).join('\\n')}\n\n---\n*Informe generado automáticamente. PREVIEW con datos simulados, scan_id = ${summary.scanUuid}.*\n`;\n\nreturn [{ json: { reportMarkdown: report, findingCount: findings.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "2e495692-0f4b-4b3e-a55c-10e055b59599",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "reportMarkdown",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "42c25725-5568-4fe2-929c-b34cb75c8c05",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/n8n/.n8n-files/informe_MOCK_GVM_PREVIEW_{{ $now.format('yyyy-MM-dd_HH-mm-ss') }}.md",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "0f44d49c-3c3c-4cf5-bb92-68c10632a55c",
+      "name": "Read/Write Files from Disk"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ca294e4e-7539-45ea-bac3-5dcc75610d75",
+  "meta": {
+    "instanceId": "e5da8a018e57a9543cc995048c683ccf25263ac6ec01fb533d166839695e3e46"
+  },
+  "id": "f1PoDYI5tsXa7l7K",
+  "tags": []
+}

@@ -38,8 +38,22 @@ sostener una conexión persistente entre nodos.
   en CVEs reales aplicables a las versiones exactas detectadas en `target1` (Apache 2.4.29,
   OpenSSH 7.6p1, vsftpd 3.0.3). **No es una respuesta real de GVM** — es una hipótesis fundada
   para poder construir y probar el resto del pipeline mientras GVM no está disponible. Se
-  reemplaza por datos reales en cuanto se conecte un GVM de verdad.
-- Nodo de parseo correspondiente: `workflow-nodes/nodo-gvm-parseo-mock.js`.
+  reemplaza por datos reales en cuanto se conecte un GVM de verdad. Una copia de este archivo
+  vive también en `../reports/_mock-get-reports-response.xml` porque esa carpeta es la que está
+  montada dentro del contenedor de n8n (ver `docker-compose.yml`) — la fuente de verdad es la
+  copia de acá.
+- `mock-gvm-preview-workflow.json` — **Workflow de n8n completamente separado del real**
+  (`MOCK - GVM Preview`), que ejecuta la cadena Execute Command (lee el mock) → parseo → adaptar
+  campos + resumen en memoria → generar informe → guardar en disco. **No inserta nada en
+  PostgreSQL** — cero riesgo de contaminar `scan_history` / `vulnerability_scans` con datos
+  simulados. Cuando GVM esté disponible, este workflow no se reutiliza ni se modifica: se
+  construye la integración real directamente en el workflow de producción
+  (`workflow/vm-pipeline-lab-apache.json`).
+- `preview-informe-ejemplo.md` — Informe real generado por ese workflow de preview el
+  07/08/2026, ejecutado dentro de n8n (no una simulación de escritorio). Confirma que la rama de
+  agrupación por severidad del generador de informes funciona de punta a punta.
+- Nodos de código correspondientes (también en `workflow-nodes/`):
+  `nodo-gvm-parseo-mock.js`, `nodo-mock-adaptar-y-resumen.js`, `nodo8-generar-informe-PREVIEW.js`.
 
 ## Advertencia para la redacción de la tesis
 

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RESPUESTA SIMULADA de get_reports (GMP). NO es una respuesta real de GVM.
+
+  Estructura basada en fuentes oficiales parcialmente confirmadas (ver
+  gvm-integration/README.md): result > nvt (cve, cvss_base) > severity > threat > qod.
+  La estructura EXACTA completa (nombres de atributos, orden, elementos opcionales)
+  queda pendiente de confirmar contra una instancia real de gvmd en la Fase 2d.
+
+  Los 3 hallazgos usan CVEs reales, elegidos a mano para coincidir con las versiones
+  de servicio detectadas de verdad en target1 (ver reports/ para la salida real de Nmap):
+    - Apache httpd 2.4.29  -> CVE-2019-0211 (rango afectado: 2.4.17-2.4.38, confirmado)
+    - OpenSSH 7.6p1        -> CVE-2018-15473 (afecta hasta 7.7, confirmado)
+    - vsftpd 3.0.3         -> sin CVE crítico conocido; se modela como hallazgo
+                              informativo (threat=Log), caso de prueba honesto para
+                              el generador de informes (no todo hallazgo tiene CVE).
+-->
+<get_reports_response status="200" status_text="OK">
+  <report id="mock-report-id-0001">
+    <report>
+      <results start="1" max="-1">
+
+        <result id="mock-result-0001">
+          <name>Apache HTTP Server Local Privilege Escalation Vulnerability (CVE-2019-0211)</name>
+          <host>172.28.0.20</host>
+          <port>80/tcp</port>
+          <nvt oid="1.3.6.1.4.1.25623.1.0.MOCK0001">
+            <name>Apache HTTP Server Local Privilege Escalation Vulnerability</name>
+            <family>Web Servers</family>
+            <cve>CVE-2019-0211</cve>
+            <cvss_base>7.8</cvss_base>
+            <tags>summary=A local privilege escalation flaw exists in Apache HTTP Server 2.4.17 through 2.4.38 due to unsafe handling of the scoreboard by child processes.|insight=Un proceso hijo con pocos privilegios (ej. un script CGI) puede ejecutar código con los privilegios del proceso padre (root).|affected=Apache HTTP Server versions 2.4.17 through 2.4.38.|solution=Actualizar a Apache HTTP Server 2.4.39 o superior.</tags>
+          </nvt>
+          <threat>High</threat>
+          <severity>7.8</severity>
+          <qod><value>80</value><type>remote_banner</type></qod>
+          <description>El servidor Apache HTTP Server 2.4.29 detectado corresponde al rango de versiones afectadas (2.4.17-2.4.38) por una vulnerabilidad de escalada de privilegios local.</description>
+        </result>
+
+        <result id="mock-result-0002">
+          <name>OpenSSH Username Enumeration Vulnerability (CVE-2018-15473)</name>
+          <host>172.28.0.20</host>
+          <port>22/tcp</port>
+          <nvt oid="1.3.6.1.4.1.25623.1.0.MOCK0002">
+            <name>OpenSSH Username Enumeration Vulnerability</name>
+            <family>Gain a shell remotely</family>
+            <cve>CVE-2018-15473</cve>
+            <cvss_base>5.3</cvss_base>
+            <tags>summary=OpenSSH through 7.7 is prone to a user enumeration vulnerability due to not delaying bailout for an invalid authenticating user until after the packet containing the request has been fully parsed.|insight=Un atacante remoto puede determinar si un nombre de usuario dado existe en el sistema, facilitando ataques de fuerza bruta dirigidos.|affected=OpenSSH through version 7.7.|solution=Actualizar a OpenSSH 7.8 o superior.</tags>
+          </nvt>
+          <threat>Medium</threat>
+          <severity>5.3</severity>
+          <qod><value>75</value><type>remote_banner</type></qod>
+          <description>El servidor OpenSSH 7.6p1 detectado está dentro del rango de versiones afectadas (hasta 7.7) por una vulnerabilidad de enumeración de usuarios.</description>
+        </result>
+
+        <result id="mock-result-0003">
+          <name>FTP Server Detection (vsftpd)</name>
+          <host>172.28.0.20</host>
+          <port>21/tcp</port>
+          <nvt oid="1.3.6.1.4.1.25623.1.0.MOCK0003">
+            <name>FTP Server Detection</name>
+            <family>Service detection</family>
+            <cve>NOCVE</cve>
+            <cvss_base>0.0</cvss_base>
+            <tags>summary=Se detectó un servicio FTP (vsftpd 3.0.3). No se identificó una vulnerabilidad crítica conocida para esta versión específica.|solution=Verificar la configuración de acceso anónimo y mantener el servicio actualizado.</tags>
+          </nvt>
+          <threat>Log</threat>
+          <severity>0.0</severity>
+          <qod><value>80</value><type>remote_banner</type></qod>
+          <description>Hallazgo informativo: presencia de servicio FTP. No representa una vulnerabilidad confirmada por sí solo.</description>
+        </result>
+
+      </results>
+      <result_count>
+        <full>3</full>
+        <filtered>3</filtered>
+      </result_count>
+    </report>
+  </report>
+</get_reports_response>

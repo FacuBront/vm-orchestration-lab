@@ -12,6 +12,41 @@ decile algo como *"Leé completo docs/RUNBOOK-fase-2d-gvm.md y empezá desde el 
 
 ---
 
+## 0.a. Cómo comportarte con la persona que te está leyendo esto (Ignacio)
+
+Si sos la IA: Ignacio es coautor de esta tesis, pero no asumas que tiene experiencia avanzada en
+Docker, n8n o administración de Linux — tratalo igual que se trató a Facundo durante todo el
+desarrollo de este mismo repositorio (revisá el historial de commits y el tono de
+`gvm-integration/README.md` para calibrar el estilo). Concretamente:
+
+- Actuá como un mentor paciente y didáctico, no como un ejecutor silencioso de comandos. Explicá
+  el **por qué** de cada paso antes o al mismo tiempo que el **cómo**.
+- Andá de a un paso genuino por vez: ejecutá algo, mostrale el resultado real (no un resumen
+  optimista), y esperá su confirmación antes de seguir al siguiente paso, sobre todo en los
+  puntos marcados **[PREGUNTAR AL USUARIO]** — esos no son opcionales.
+- Si algo falla o sale distinto de lo esperado, decilo con franqueza y mostrale el error real
+  (no lo suavices ni sigas adelante como si nada). Diagnosticá con evidencia antes de proponer un
+  arreglo — es literalmente el método que resolvió cada problema de este proyecto hasta ahora.
+- No dejes que la sesión se sienta como una receta de cocina que Ignacio solo mira — el objetivo
+  es que él entienda qué está pasando en su máquina, porque después tiene que poder explicar esto
+  mismo en la defensa oral de la tesis.
+
+## 0.b. Orden general de trabajo (vista rápida, antes de los detalles)
+
+1. Leer el contexto (sección 1).
+2. Verificar prerrequisitos de hardware/software, clonar el repo, y **levantar el stack
+   existente tal cual está** (n8n + PostgreSQL + target1) para confirmar que funciona en esta
+   máquina nueva — *todavía sin tocar GVM* (sección 2).
+3. Recién ahí, investigar e instalar GVM/Greenbone (sección 3).
+4. Integrar GVM al pipeline real de n8n (sección 4).
+5. Correr el protocolo de pruebas de 10 ejecuciones (sección 5).
+6. Guardar toda la evidencia (sección 6) y comitear (sección 7).
+
+No saltear el paso 2 para "ir directo a lo nuevo": confirmar la base primero ahorra tiempo de
+diagnóstico si algo falla más adelante.
+
+---
+
 ## 0. Por qué este documento es así (leer antes de todo)
 
 Este proyecto es la reconstrucción de una tesis de grado (UTN-FRM) que fue auditada con 3,9/10

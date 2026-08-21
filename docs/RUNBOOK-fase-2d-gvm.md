@@ -129,6 +129,30 @@ docker compose ps
 
 Confirmar los 3 servicios `healthy`/`Up` antes de continuar.
 
+### 2.1. IMPORTANTE — n8n es local a esta máquina, no hay nada compartido
+
+`http://localhost:5678` apunta al contenedor de n8n corriendo **en esta máquina**, con su propia
+base de datos interna (volumen Docker `n8n_data`), que no tiene ninguna relación con la instancia
+de n8n de Facundo ni de nadie más. Al abrirlo por primera vez acá, n8n va a pedir crear un usuario
+owner **nuevo**, sin workflows — es normal, no es un error ni significa que algo se rompió.
+
+Los workflows que ya se construyeron viven como archivos JSON exportados en el repo, y hay que
+**importarlos a mano** en esta instancia:
+
+1. Abrir `http://localhost:5678`, crear el usuario owner local.
+2. Desde el editor, usar **"Import from File"** (menú `⋯` arriba a la derecha, o al crear un
+   workflow nuevo) e importar `workflow/vm-pipeline-lab-apache.json` (el pipeline real).
+3. Importar también `gvm-integration/mock-gvm-preview-workflow.json` si hace falta revisar cómo
+   quedó armado el preview antes de extenderlo.
+4. **Las credenciales NO se exportan en el JSON** (por seguridad, n8n nunca incluye contraseñas
+   al exportar). Después de importar, el nodo Postgres va a marcar error hasta crear una
+   credencial nueva en Settings → Credentials, tipo Postgres, apuntando a:
+   - Host: `postgres` (nombre del servicio, funciona igual que en la máquina original porque está
+     en la misma red Docker local de este `docker-compose.yml`)
+   - Database/User/Password: los valores del propio `.env` de esta máquina (`POSTGRES_DB`,
+     `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD`)
+   - Port: `5432`, SSL: disabled
+
 ## 3. Instalar GVM/Greenbone Community Edition — investigar antes de ejecutar
 
 **No hay un docker-compose.yml de GVM ya escrito y probado en este repo — hay que construirlo.**

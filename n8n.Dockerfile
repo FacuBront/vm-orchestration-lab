@@ -23,20 +23,26 @@
 FROM node:20-alpine
 
 # Paquetes del sistema:
-# - nmap: el escáner de descubrimiento, motivo de todo este archivo.
+# - nmap: el escáner de descubrimiento, motivo original de este archivo.
 # - nmap-scripts: en Alpine, el motor de scripting NSE (nse_main.lua y
 #   los scripts .nse) viene en un paquete SEPARADO de "nmap". Sin él,
 #   Nmap falla al arrancar con "could not locate nse_main.lua" incluso
 #   para un escaneo simple, porque inicializa el motor de scripts
 #   siempre, se usen scripts explícitos o no.
 # - tzdata: para que GENERIC_TIMEZONE/TZ funcionen correctamente en n8n.
-# - python3, make, g++: dependencias de compilación que necesitan algunos
-#   módulos nativos de Node que n8n usa internamente (p. ej. sqlite3).
-#   Se instalan y desinstalan en la misma capa para no dejarlas en la
-#   imagen final (más liviano, relevante con 4GB de RAM).
-RUN apk add --no-cache nmap nmap-scripts tzdata && \
-    apk add --no-cache --virtual .build-deps python3 make g++ && \
+# - python3, py3-pip: a diferencia de la v1 de este archivo, ahora
+#   quedan en la imagen final (no son solo build-deps) porque la
+#   Fase 2d (GVM) necesita ejecutar "gvm-cli" (de gvm-tools, un paquete
+#   de Python) en runtime desde el nodo "Execute Command", igual que ya
+#   se hace con Nmap.
+# - make, g++, libffi-dev, openssl-dev: build-deps. Necesarios solo por
+#   si pip tiene que compilar alguna dependencia nativa de gvm-tools
+#   (cryptography/lxml) en vez de bajar un wheel prearmado para esta
+#   plataforma; se desinstalan en la misma capa igual que antes.
+RUN apk add --no-cache nmap nmap-scripts tzdata python3 py3-pip && \
+    apk add --no-cache --virtual .build-deps make g++ libffi-dev openssl-dev && \
     npm install -g n8n && \
+    pip install --no-cache-dir --break-system-packages gvm-tools && \
     apk del .build-deps && \
     npm cache clean --force
 

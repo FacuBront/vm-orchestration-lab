@@ -1,0 +1,38 @@
+Evidencia real — Paso 3.3 del runbook Fase 2d (docs/RUNBOOK-fase-2d-gvm.md)
+Fecha: 21/08/2026
+Máquina: notebook de Ignacio (coautor), primera integración real de GVM tras
+la pausa por RAM insuficiente en la notebook original.
+
+Comando ejecutado (desde el contenedor n8n, usando el socket compartido por
+volumen con gvmd — arquitectura descrita en docker-compose.gvm.yml):
+
+    docker compose -f docker-compose.yml -f docker-compose.gvm.yml exec n8n \
+      gvm-cli --gmp-username admin --gmp-password admin \
+      socket --socketpath /run/gvmd/gvmd.sock --xml "<get_version/>"
+
+Salida real:
+
+    <get_version_response status="200" status_text="OK"><version>22.7</version></get_version_response>
+
+Hallazgos verificados en el camino (corrigen supuestos de
+gvm-integration/README.md, escrito antes de tener GVM instalado):
+- GMP en esta versión (22.7) SÍ requiere autenticación incluso para
+  get_version — no es anónimo como se había asumido. Sin --gmp-username/
+  --gmp-password, gvm-cli queda esperando input interactivo por stdin.
+- El usuario "admin" se crea automáticamente al iniciar gvmd por primera vez,
+  con contraseña por defecto "admin" (confirmado contra los logs reales del
+  contenedor gvmd — no aparece ninguna contraseña aleatoria distinta).
+  Se cambió con: docker compose exec -u gvmd gvmd gvmd --user=admin
+  --new-password='...' (password real en .env, GVM_ADMIN_PASSWORD).
+
+- HALLAZGO (verificado en vivo, 21/08/2026): "gvmd --user=admin
+  --new-password=..." modifica la contraseña en la base, pero el proceso
+  gvmd YA CORRIENDO sigue aceptando la contraseña vieja además de la nueva
+  (probado con get_tasks, que sí exige auth real, no solo get_version) hasta
+  que se reinicia el contenedor. Confirmado: tras
+  "docker compose ... restart gvmd", la contraseña vieja pasa a rechazarse
+  (400 Authentication failed) y solo la nueva funciona. Conclusión: gvmd
+  cachea credenciales en memoria de proceso y no las recarga en caliente —
+  todo cambio de contraseña de un usuario de GMP necesita un restart de
+  gvmd para tener efecto real. No estaba documentado en gvm-integration/
+  README.md (escrito sin GVM instalado).

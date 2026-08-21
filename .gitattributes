@@ -1,0 +1,12 @@
+# Forzar LF en scripts que se ejecutan dentro de contenedores Linux,
+# sin importar la config de core.autocrlf de quien clone en Windows.
+#
+# Motivo (Fase 2d, verificado en vivo): con core.autocrlf=true (default
+# recomendado de Git para Windows), el checkout convertía estos .sh a
+# CRLF. Docker fallaba con "exec /entrypoint.sh: no such file or
+# directory" -mensaje engañoso: el archivo existe, pero el shebang queda
+# como "#!/bin/bash\r" y el sistema busca un intérprete "bash\r" que no
+# existe-. El mismo problema rompió silenciosamente sql/init/02_app_user.sh
+# dentro de PostgreSQL (el healthcheck no lo detectó porque solo valida
+# pg_isready, no que los scripts de init hayan corrido bien).
+*.sh text eol=lf

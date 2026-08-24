@@ -1,0 +1,8 @@
+docker-compose-ps-gvm.png -- epigrafe "Estado de todos los servicios del laboratorio (base + GVM) sanos y corriendo."
+
+workflow-canvas-con-gvm.png -- "Workflow completo en n8n, con los 26 nodos incluyendo la integración real con GVM (secuencia GMP completa) y con los 26 nodos finalizados sin errores."
+
+gvm-gsa-10-tareas-done.png -- "Interfaz web de GVM/Greenbone (GSA), listado de las 10 tareas del protocolo (renombradas 01-10 para orden visual), todas completadas (Done)."
+
+informe-cve-real -- "Fragmento de un informe real generado por el pipeline, con CVEs concretos, severidad y solución recomendada obtenidos de GVM."
+

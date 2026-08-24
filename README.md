@@ -24,16 +24,16 @@ historial de commits).
 | 2a. n8n + Nmap | ✅ Completa | Imagen propia de n8n con Nmap embebido |
 | 2b. PostgreSQL | ✅ Completa | Esquema `scan_history` / `vulnerability_scans`, usuario restringido |
 | 2c. Contenedor objetivo | ✅ Completa | Ubuntu 18.04 con SSH/FTP/Apache reales (CVEs verificables por versión) |
-| 2d. GVM / Greenbone | ⏸️ Pausada | Requiere ≥4 GB de RAM dedicados; se retoma con una máquina de mayores recursos |
-| 4. Workflow n8n de punta a punta | ✅ Completa | Nmap → parseo → PostgreSQL → informe → archivo en disco |
+| 2d. GVM / Greenbone | ✅ Completa | GVM/Greenbone Community Edition real, integrado por GMP (socket Unix compartido) a `labnet`; protocolo de 10 corridas ejecutado con evidencia real (`docs/resultados-10-corridas-gvm.md`) |
+| 4. Workflow n8n de punta a punta | ✅ Completa | Nmap → GVM real → parseo → PostgreSQL → informe → archivo en disco |
 | 5. Evidencia y GitHub | 🔄 En progreso | Este repositorio |
 | 6. Reescritura de la tesis | ⏳ Pendiente | Se redacta solo sobre la evidencia de este repo |
 
-**Nota metodológica importante:** con GVM todavía no integrado, los "hallazgos" que produce el
-pipeline hoy son datos de **reconocimiento de Nmap** (servicio + versión detectados), no
-vulnerabilidades con CVE confirmado. El código del informe (`workflow-nodes/nodo8-generar-informe.js`)
-lo declara así explícitamente y está diseñado para que, cuando GVM se integre, las mismas columnas
-(`cve_id`, `severity_label`, `description`, `solution`) se completen sin cambiar una línea de código.
+**Nota metodológica:** el pipeline corre Nmap (reconocimiento de servicio/versión) y GVM real
+(correlación contra CVEs conocidos) en la misma ejecución. Los hallazgos de Nmap quedan como fila
+base por host:puerto; cada CVE real que GVM encuentra para ese host:puerto se inserta como fila
+adicional (`cve_id`, `severity_score`, `severity_label`, `description`, `solution` poblados) — ver
+la decisión de diseño documentada en `gvm-integration/hallazgo-estructura-real-get-reports.md`.
 
 ## Arquitectura
 

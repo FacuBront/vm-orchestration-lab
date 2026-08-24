@@ -1,10 +1,29 @@
-# Preparación de la integración con GVM/Greenbone (Fase 2d)
+# Integración con GVM/Greenbone (Fase 2d)
 
-Esta carpeta contiene trabajo preparatorio para la integración con GVM, hecho **sin tener GVM
-instalado todavía** (bloqueado por RAM insuficiente en la notebook de desarrollo — ver
-`docs/decisiones-arquitectura.md` en la raíz). El objetivo es dejar la lógica de parseo e
-inserción en base de datos ya construida y probada, para que conectar el GVM real cuando esté
-disponible sea solo cuestión de reemplazar la fuente del XML, sin tocar el resto del pipeline.
+**Actualización — GVM real ya integrado y en producción.** El contenido original de esta carpeta
+(mock, hipótesis de estructura) se conserva abajo como registro histórico de lo que se investigó
+**antes** de tener una instancia de GVM corriendo. Con GVM real instalado se confirmaron aciertos
+y se corrigieron varios supuestos — ver:
+
+- `hallazgo-estructura-real-get-reports.md` — la estructura real de `get_reports` difiere del mock
+  (no hay etiqueta `<cve>` limpia, los CVEs van como texto libre en `<tags>`, un resultado puede
+  traer varios CVEs) y la decisión de diseño resultante (insertar una fila por CVE, no actualizar).
+- `evidencia-get-version.txt` — primera conexión GMP real verificada, y el hallazgo de que GMP sí
+  exige autenticación (contra lo que se creía) y que gvmd cachea credenciales en memoria.
+- `reporte-real-target1-2026-08-21.xml` — respuesta real completa de `get_reports` contra
+  `target1`, usada como fuente de verdad para construir el parser real
+  (`workflow-nodes/nodo-gvm-parseo-real.js`).
+- `referencia-oficial/` — copia del `docker-compose` oficial de Greenbone que se usó de base para
+  `docker-compose.gvm.yml` (raíz del repo).
+- `../docs/resultados-10-corridas-gvm.md` — protocolo de 10 ejecuciones consecutivas del pipeline
+  completo con GVM real, con tiempos y hallazgos reales.
+
+**Contenido original de esta carpeta (contexto histórico, pre-GVM):** trabajo preparatorio para
+la integración con GVM, hecho sin tener GVM instalado todavía (bloqueado en su momento por RAM
+insuficiente en la notebook de desarrollo original). El objetivo era dejar la lógica de parseo e
+inserción en base de datos ya construida y probada, para que conectar el GVM real cuando estuviera
+disponible fuera solo cuestión de reemplazar la fuente del XML — en la práctica, hizo falta además
+corregir la estructura de parseo contra los datos reales (ver arriba).
 
 ## Qué se investigó y confirmó (fuentes oficiales)
 

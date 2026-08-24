@@ -22,20 +22,27 @@ if (findings.length === 0) {
 }
 
 // --- Inventario de hosts (fix C-08: nunca implementado en la tesis anterior) ---
+//
+// HALLAZGO real (Fase 2d, 24/08/2026): con GVM insertando una fila por CADA
+// CVE (varias por puerto — ver decisión de diseño en
+// gvm-integration/hallazgo-estructura-real-get-reports.md), "ports" sin
+// deduplicar terminaba listando el mismo puerto decenas de veces (ej. "80"
+// repetido 70 veces). Se usa un Set para que cada puerto aparezca una sola
+// vez, sin perder la cuenta real de hallazgos (que sí cuenta cada fila).
 const hostMap = new Map();
 for (const f of findings) {
   if (!hostMap.has(f.host_ip)) {
-    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: [] });
+    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: new Set() });
   }
   const entry = hostMap.get(f.host_ip);
   entry.count += 1;
-  entry.ports.push(f.port);
+  if (f.port != null) entry.ports.add(f.port);
 }
 
 let hostInventory = '| Host (IP) | Hostname | Puertos detectados | Cant. hallazgos |\n';
 hostInventory += '|---|---|---|---|\n';
 for (const [ip, data] of hostMap.entries()) {
-  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${data.ports.join(', ')} | ${data.count} |\n`;
+  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${[...data.ports].sort((a, b) => a - b).join(', ')} | ${data.count} |\n`;
 }
 
 // --- Agrupación por severidad (si GVM ya la completó) o por servicio
@@ -61,7 +68,13 @@ if (hasSeverityData) {
     if (items.length === 0) continue;
     detailSection += `\n### ${label} (${items.length})\n\n`;
     for (const f of items) {
-      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name} (${f.service_version})\n`;
+      // Las filas que vienen de GVM (Fase 2d) no tienen service_name/
+      // service_version propio (solo lo captura Nmap) — se omite el
+      // paréntesis en vez de mostrar el feo "— null (null)".
+      const servicio = f.service_name
+        ? ` — ${f.service_name}${f.service_version ? ` (${f.service_version})` : ''}`
+        : '';
+      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}**${servicio}\n`;
       if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\n`;
       if (f.description) detailSection += `  - Descripción: ${f.description}\n`;
       if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\n`;

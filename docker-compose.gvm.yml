@@ -339,11 +339,18 @@ services:
       - gvmd
       - ospd-openvas
 
-  # n8n ya está definido en docker-compose.yml; acá se agrega SOLO el
-  # volumen del socket de gvmd (se fusiona con sus volúmenes existentes).
+  # n8n ya está definido en docker-compose.yml; acá se agrega el volumen del
+  # socket de gvmd (se fusiona con sus volúmenes existentes) y las
+  # credenciales de GMP como variables de entorno del proceso — así los
+  # nodos "Execute Command" las leen vía $GVM_ADMIN_USER/$GVM_ADMIN_PASSWORD
+  # en el comando de shell, en vez de tener la contraseña escrita en texto
+  # plano dentro del JSON del workflow (que sí se commitea a git).
   n8n:
     volumes:
       - gvmd_socket_vol:/run/gvmd
+    environment:
+      - GVM_ADMIN_USER=${GVM_ADMIN_USER}
+      - GVM_ADMIN_PASSWORD=${GVM_ADMIN_PASSWORD}
 
 volumes:
   gpg_data_vol:

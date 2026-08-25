@@ -6,16 +6,26 @@
 // hosts que la tesis anterior prometía en el objetivo 6 pero el código
 // nunca generaba.
 //
-// Nota metodológica (documentar en la tesis): como GVM todavía no está
-// integrado (Fase 2d, pendiente de hardware), estos son hallazgos de
-// RECONOCIMIENTO de Nmap (servicio + versión), no vulnerabilidades con
-// CVE confirmado. El informe lo declara así explícitamente para no
-// sobrerrepresentar el resultado. Cuando GVM esté disponible, las mismas
-// columnas (cve_id, severity_label, description, solution) se van a
-// poblar y este mismo código las va a mostrar sin cambiar una línea.
+// ACTUALIZACIÓN (Fase 2d completa, ver docs/resultados-10-corridas-gvm.md):
+// GVM/Greenbone real ya está integrado. Los hallazgos con cve_id,
+// severity_score, severity_label, description y solution poblados son
+// correlaciones reales contra CVEs conocidos (no solo reconocimiento de
+// Nmap) — ver gvm-integration/hallazgo-estructura-real-get-reports.md
+// para el detalle completo de cómo se construyó el parseo real. El
+// código de este nodo no necesitó cambios estructurales para esto, tal
+// como se planeó desde el mock: solo se ajustaron los dos detalles reales
+// documentados más abajo (deduplicación de puertos, y el caso de filas de
+// GVM sin service_name propio).
 
 const findings = $input.all().map((item) => item.json);
 const summary = $('Resumen Scan History').first().json;
+
+// Fix (ver RUNBOOK-continuidad-post-fase2d.md, punto A.3): "summary.finishedAt"
+// se capturó apenas terminó Nmap, antes de que arrancara GVM — reflejaba
+// ~6s en vez de los ~14 minutos reales. Se sobreescribe acá con el
+// timestamp real, tomado después de que GVM terminó e insertó sus hallazgos.
+const finReal = $('Actualizar Fin Real Scan History').first().json?.finished_at;
+if (finReal) summary.finishedAt = finReal;
 
 if (findings.length === 0) {
   throw new Error('No se recibieron hallazgos desde la consulta a PostgreSQL. Verificar el nodo anterior.');
@@ -92,7 +102,7 @@ if (hasSeverityData) {
 
 // --- Recomendaciones generales (fix C-08) ---
 const recommendations = [
-  'Correlacionar estos hallazgos con una base de datos de CVE (GVM/Greenbone) antes de tomar acciones de remediación.',
+  'Priorizar la remediación de los hallazgos de severidad Crítica y Alta con CVE conocido, confirmados por correlación real contra GVM/Greenbone.',
   'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',
   'Restringir el acceso de red a los puertos detectados únicamente a los hosts que efectivamente lo necesiten.',
   'Repetir este escaneo de forma periódica para detectar desviaciones respecto de esta línea base.',

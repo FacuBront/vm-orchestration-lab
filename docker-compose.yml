@@ -111,7 +111,7 @@ services:
     # Contenedor objetivo construido por nosotros (ver target1.Dockerfile
     # para la justificación completa: la imagen comunitaria original,
     # citizenstig/metasploitable2, fue retirada de Docker Hub). Corre
-    # Ubuntu 16.04 con SSH, FTP y Apache en sus versiones originales de
+    # Ubuntu 18.04 con SSH, FTP y Apache en sus versiones originales de
     # esa distribución, ya EOL. Solo existe dentro de "labnet": no se
     # expone ningún puerto al host, por lo que es inalcanzable desde
     # fuera de la red aislada del laboratorio.

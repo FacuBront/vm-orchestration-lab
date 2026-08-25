@@ -69,3 +69,17 @@ Installation path / port: 80/tcp</description>
 - 79 resultados totales, 26 con QoD ≥ 70.
 - Distribución por puerto: 21/tcp → 5 resultados, 22/tcp → 23, 80/tcp → 42.
 - 56 CVEs reales distintos mencionados en total (ver `cves-reales-target1-2026-08-21.txt`).
+
+## Resolución de la pregunta de QoD
+
+**Decisión tomada:** no filtrar por QoD (`min_qod=0` en el filtro de `get_reports` — ver el nodo
+"GMP Get Reports" del workflow real). Se prefirió no perder hallazgos de severidad alta con QoD
+bajo (como el caso real documentado arriba: CVSS 9.0 con QoD 30) antes que aplicar el umbral por
+defecto de la interfaz web de GVM (70).
+
+**Limitación conocida, a declarar explícitamente en la tesis:** esta decisión puede incluir más
+falsos positivos que el comportamiento por defecto de GVM. Se documenta como decisión consciente
+de diseño (priorizar no perder hallazgos graves), no como un descuido — ver el capítulo de
+Alcances y Limitaciones de la tesis para la redacción formal de esta decisión.
+
+**Confirmado con el usuario:**  [La fecha fue 21/08/2026]

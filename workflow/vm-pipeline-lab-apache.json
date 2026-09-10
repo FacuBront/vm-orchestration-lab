@@ -14,19 +14,6 @@
     },
     {
       "parameters": {
-        "command": "nmap -sV -oX - target1"
-      },
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        7296,
-        2912
-      ],
-      "id": "6dae5d82-c6ed-4328-a25f-5900a2d4aca1",
-      "name": "Execute Command"
-    },
-    {
-      "parameters": {
         "jsCode": "// Nodo 3 — Parseo del XML de Nmap.\n// Fix de hallazgos del dictamen: try/catch real, parseStringPromise\n// (async, no callback), encadenamiento opcional en todo acceso a campos\n// que pueden no existir (evita que un host \"raro\" tire abajo el nodo).\n// v2: agrega los timestamps reales del escaneo (tomados del propio XML\n// de Nmap, no de la hora de ejecución de n8n).\n\nconst { parseStringPromise } = require('xml2js');\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const rawXml = item.json.stdout;\n\n  if (!rawXml) {\n    throw new Error('El item no contiene stdout con el XML de Nmap. Verificar el nodo Execute Command anterior.');\n  }\n\n  let parsed;\n  try {\n    parsed = await parseStringPromise(rawXml, { explicitArray: true });\n  } catch (err) {\n    results.push({\n      json: {\n        parseError: true,\n        errorMessage: err.message,\n        rawXmlSnippet: rawXml.slice(0, 200),\n      },\n    });\n    continue;\n  }\n\n  // Timestamps reales del escaneo, tomados del propio Nmap (epoch en\n  // segundos -> ISO 8601 para que Postgres los acepte sin conversión).\n  const startEpoch = parsed?.nmaprun?.$?.start ?? null;\n  const endEpoch = parsed?.nmaprun?.runstats?.[0]?.finished?.[0]?.$?.time ?? null;\n  const scanStartedAt = startEpoch ? new Date(Number(startEpoch) * 1000).toISOString() : null;\n  const scanFinishedAt = endEpoch ? new Date(Number(endEpoch) * 1000).toISOString() : null;\n\n  const hosts = parsed?.nmaprun?.host ?? [];\n\n  for (const host of hosts) {\n    const address = host?.address?.[0]?.$?.addr ?? 'unknown';\n    const hostname = host?.hostnames?.[0]?.hostname?.[0]?.$?.name ?? null;\n    const hostStatus = host?.status?.[0]?.$?.state ?? 'unknown';\n    const ports = host?.ports?.[0]?.port ?? [];\n\n    if (ports.length === 0) {\n      results.push({\n        json: {\n          parseError: false,\n          hostIp: address,\n          hostname,\n          hostStatus,\n          port: null,\n          protocol: null,\n          serviceName: null,\n          serviceProduct: null,\n          serviceVersion: null,\n          scanStartedAt,\n          scanFinishedAt,\n        },\n      });\n      continue;\n    }\n\n    for (const port of ports) {\n      const service = port?.service?.[0]?.$ ?? {};\n      results.push({\n        json: {\n          parseError: false,\n          hostIp: address,\n          hostname,\n          hostStatus,\n          port: port?.$?.portid ?? null,\n          protocol: port?.$?.protocol ?? null,\n          portState: port?.state?.[0]?.$?.state ?? 'unknown',\n          serviceName: service.name ?? null,\n          serviceProduct: service.product ?? null,\n          serviceVersion: service.version ?? null,\n          serviceExtraInfo: service.extrainfo ?? null,\n          scanStartedAt,\n          scanFinishedAt,\n        },\n      });\n    }\n  }\n}\n\nreturn results;"
       },
       "type": "n8n-nodes-base.code",
@@ -86,183 +73,6 @@
       ],
       "id": "3f5cd65a-7132-451d-a3bd-b8d90c85ae2a",
       "name": "Adjuntar Scan Id"
-    },
-    {
-      "parameters": {
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "vulnerability_scans",
-          "mode": "list",
-          "cachedResultName": "vulnerability_scans"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "severity_score": 0,
-            "service_version": "={{ $json.serviceProduct }} {{ $json.serviceVersion }}{{ $json.serviceExtraInfo ? ' (' + $json.serviceExtraInfo + ')' : '' }}",
-            "service_name": "={{ $json.serviceName }}",
-            "protocol": "={{ $json.protocol }}",
-            "port": "={{ $json.port }}",
-            "hostname": "={{ $json.hostname }}",
-            "host_ip": "={{ $json.hostIp }}",
-            "scan_id": "={{ $json.scanId }}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "scan_id",
-              "displayName": "scan_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "host_ip",
-              "displayName": "host_ip",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "hostname",
-              "displayName": "hostname",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "port",
-              "displayName": "port",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "protocol",
-              "displayName": "protocol",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "service_name",
-              "displayName": "service_name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "service_version",
-              "displayName": "service_version",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "cve_id",
-              "displayName": "cve_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "severity_score",
-              "displayName": "severity_score",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "severity_label",
-              "displayName": "severity_label",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "solution",
-              "displayName": "solution",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "detected_at",
-              "displayName": "detected_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        8416,
-        2912
-      ],
-      "id": "1f79c6a1-40af-4c2c-959c-e28021102a5b",
-      "name": "Insert rows in a table",
-      "credentials": {
-        "postgres": {
-          "id": "cp6Ie0GU9AkhFLLL",
-          "name": "Postgres account"
-        }
-      }
     },
     {
       "parameters": {
@@ -443,7 +253,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Nodo de parseo GVM/GMP — VERSIÓN REAL, contra una instancia de GVM/Greenbone\n// de verdad (Fase 2d). Copiado de nodo-gvm-parseo-mock.js y corregido contra\n// la respuesta real de gvmd 26.36.1 / GVM 22.7 (ver\n// gvm-integration/hallazgo-estructura-real-get-reports.md para el detalle\n// completo y el XML de ejemplo real).\n//\n// Dos diferencias reales confirmadas contra lo que asumía el mock:\n//\n// 1) NO existe una etiqueta <cve> limpia dentro de <nvt>. Los CVEs vienen como\n//    texto libre dentro de <tags>, en la sub-parte \"insight=\", y un solo\n//    resultado de GVM puede mencionar VARIOS CVEs (los NVT tipo \"Multiple\n//    Vulnerabilities\" agrupan CVEs relacionados con la misma versión de\n//    software). Acá se extraen con una regex sobre el texto de \"insight\".\n//\n// 2) <host> no es un elemento de solo texto: tiene contenido mixto\n//    (texto + hijos <asset/> y <hostname>). Con xml2js (explicitArray: true,\n//    explicitCharkey por defecto), el texto queda bajo la clave \"_\", no\n//    directamente en r.host[0] como asumía el mock.\n//\n// Decisión de diseño (confirmada explícitamente con el usuario, 22/08/2026):\n// como un mismo host:puerto puede tener MUCHOS hallazgos reales de GVM (se\n// vio un caso real: 42 hallazgos distintos en el puerto 80 de target1), no\n// alcanza con \"actualizar\" la única fila que dejó Nmap para ese puerto sin\n// truncar datos. Se decidió INSERTAR una fila nueva por cada CVE encontrado,\n// dejando la fila original de Nmap intacta como reconocimiento base. Menos\n// prolijo que 1 fila por puerto, pero consistente con el principio del repo\n// de no truncar resultados (evita repetir los hallazgos C-07/C-08 del\n// dictamen original).\n//\n// Resultados sin ningún CVE en el texto:\n//   - threat === 'Log' (ruido puramente informativo, ej. banners de detección\n//     de versión sin vulnerabilidad asociada): se descartan, igual que la\n//     propia UI de GVM los trata como no accionables por defecto.\n//   - cualquier otro threat (Low/Medium/High/Critical) sin CVE textual (ej.\n//     hallazgos de configuración sin CVE asignado): se conserva UNA fila con\n//     cve_id = null — es un hallazgo real, no ruido, y el esquema ya tolera\n//     cve_id nulo.\n\nconst { parseStringPromise } = require('xml2js');\n\n// Traducción de los niveles de threat de GMP a las etiquetas en español que\n// usa nuestro esquema (columna severity_label: Crítica | Alta | Media | Baja | Ninguna).\nconst THREAT_TO_LABEL = {\n  Critical: 'Crítica',\n  High: 'Alta',\n  Medium: 'Media',\n  Low: 'Baja',\n  Log: 'Ninguna',\n  Debug: 'Ninguna',\n};\n\nconst CVE_REGEX = /CVE-\\d{4}-\\d+/g;\n\nfunction extraerTag(tagsString, clave) {\n  // El campo \"tags\" de un NVT viene como pares clave=valor separados por \"|\",\n  // ej: \"summary=...|insight=...|solution=...\". Convención documentada por\n  // Greenbone; no hay subelementos separados para cada una en get_reports.\n  if (!tagsString) return null;\n  const partes = tagsString.split('|');\n  for (const parte of partes) {\n    const idx = parte.indexOf('=');\n    if (idx === -1) continue;\n    const k = parte.slice(0, idx).trim();\n    const v = parte.slice(idx + 1).trim();\n    if (k === clave) return v || null;\n  }\n  return null;\n}\n\nfunction extraerHostIp(hostNode) {\n  // Contenido mixto real: texto (IP) + <asset/> + <hostname>. xml2js deja el\n  // texto bajo \"_\" cuando hay hijos. Si algún día no hubiera hijos (como\n  // asumía el mock), r.host[0] sería directamente el string — se contempla\n  // igual por robustez.\n  if (hostNode == null) return null;\n  if (typeof hostNode === 'string') return hostNode;\n  return hostNode._ ?? null;\n}\n\nfunction extraerCves(tagsString) {\n  const insight = extraerTag(tagsString, 'insight') ?? '';\n  const matches = insight.match(CVE_REGEX);\n  return matches ? [...new Set(matches)] : [];\n}\n\nconst scanId = $('Insert Scan History').first().json.id;\nif (scanId === undefined || scanId === null) {\n  throw new Error('No se pudo obtener el scan_id del nodo \"Insert Scan History\".');\n}\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const rawXml = item.json.stdout;\n\n  if (!rawXml) {\n    throw new Error('El item no contiene stdout con el XML de get_reports. Verificar el nodo \"GMP Get Reports\" anterior.');\n  }\n\n  let parsed;\n  try {\n    parsed = await parseStringPromise(rawXml, { explicitArray: true });\n  } catch (err) {\n    throw new Error(`No se pudo parsear el XML de get_reports: ${err.message}. Fragmento: ${rawXml.slice(0, 300)}`);\n  }\n\n  const reportResults =\n    parsed?.get_reports_response?.report?.[0]?.report?.[0]?.results?.[0]?.result ?? [];\n\n  if (reportResults.length === 0) {\n    // 0 hallazgos es un resultado válido (target sin vulnerabilidades\n    // detectadas), no un error — no se inserta nada, se sigue el flujo.\n    continue;\n  }\n\n  for (const r of reportResults) {\n    const hostIp = extraerHostIp(r?.host?.[0]);\n    // formato normal \"80/tcp\"; pero también aparece \"general/tcp\",\n    // \"general/icmp\", \"general/CPE-T\" para hallazgos a nivel de host/SO,\n    // no atados a un puerto real (ej. detección de sistema operativo).\n    // HALLAZGO real (22/08/2026): Number(\"general\") da NaN, que al\n    // serializarse a JSON se convierte en null silenciosamente, y ese null\n    // terminaba llegando a Postgres como el TEXTO \"null\" en vez de un NULL\n    // real, rompiendo el INSERT en la columna entera port. Se detecta\n    // explícitamente con Number.isInteger en vez de confiar en el ternario.\n    const portRaw = r?.port?.[0] ?? null;\n    let portNum = null;\n    let protocol = null;\n    if (portRaw) {\n      const [portPart, protoPart] = portRaw.split('/');\n      const parsedPort = Number(portPart);\n      portNum = Number.isInteger(parsedPort) ? parsedPort : null;\n      protocol = protoPart ?? null;\n    }\n\n    const nvt = r?.nvt?.[0] ?? {};\n    const tags = nvt?.tags?.[0] ?? null;\n\n    const threat = r?.threat?.[0] ?? 'Log';\n    const severityScore = Number(r?.severity?.[0] ?? 0);\n    const description = extraerTag(tags, 'summary') ?? r?.description?.[0] ?? null;\n    const solution = extraerTag(tags, 'solution') ?? null;\n\n    const baseFields = {\n      hostIp,\n      port: portNum,\n      protocol,\n      severityScore,\n      severityLabel: THREAT_TO_LABEL[threat] ?? 'Ninguna',\n      description,\n      solution,\n      scanId,\n    };\n\n    const cves = extraerCves(tags);\n\n    if (cves.length > 0) {\n      for (const cveId of cves) {\n        results.push({ json: { ...baseFields, cveId } });\n      }\n    } else if (threat !== 'Log') {\n      results.push({ json: { ...baseFields, cveId: null } });\n    }\n    // threat === 'Log' sin CVE: se descarta (ver comentario del encabezado).\n  }\n}\n\nreturn results;\n"
+        "jsCode": "// Nodo de parseo GVM/GMP — VERSIÓN REAL, contra una instancia real de\n// GVM/Greenbone, no contra datos simulados. Corregido contra la respuesta\n// real de gvmd 26.36.1 / GVM 22.7. (ver\n// gvm-integration/hallazgo-estructura-real-get-reports.md para el detalle\n// completo y el XML de ejemplo real).\n//\n// Dos diferencias reales confirmadas contra lo que asumía el mock:\n//\n// 1) NO existe una etiqueta <cve> limpia dentro de <nvt>. Los CVEs vienen como\n//    texto libre dentro de <tags>, en la sub-parte \"insight=\", y un solo\n//    resultado de GVM puede mencionar VARIOS CVEs (los NVT tipo \"Multiple\n//    Vulnerabilities\" agrupan CVEs relacionados con la misma versión de\n//    software). Acá se extraen con una regex sobre el texto de \"insight\".\n//\n// 2) <host> no es un elemento de solo texto: tiene contenido mixto\n//    (texto + hijos <asset/> y <hostname>). Con xml2js (explicitArray: true,\n//    explicitCharkey por defecto), el texto queda bajo la clave \"_\", no\n//    directamente en r.host[0] como asumía el mock.\n//\n// Decisión de diseño (confirmada explícitamente con el usuario, 22/08/2026):\n// como un mismo host:puerto puede tener MUCHOS hallazgos reales de GVM (se\n// vio un caso real: 42 hallazgos distintos en el puerto 80 de target1), no\n// alcanza con \"actualizar\" la única fila que dejó Nmap para ese puerto sin\n// truncar datos. Se decidió INSERTAR una fila nueva por cada CVE encontrado,\n// dejando la fila original de Nmap intacta como reconocimiento base. Menos\n// prolijo que 1 fila por puerto, pero consistente con el principio del repo\n// de no truncar resultados.\n//\n// Resultados sin ningún CVE en el texto:\n//   - threat === 'Log' (ruido puramente informativo, ej. banners de detección\n//     de versión sin vulnerabilidad asociada): se descartan, igual que la\n//     propia UI de GVM los trata como no accionables por defecto.\n//   - cualquier otro threat (Low/Medium/High/Critical) sin CVE textual (ej.\n//     hallazgos de configuración sin CVE asignado): se conserva UNA fila con\n//     cve_id = null — es un hallazgo real, no ruido, y el esquema ya tolera\n//     cve_id nulo.\n\nconst { parseStringPromise } = require('xml2js');\n\n// Traducción de los niveles de threat de GMP a las etiquetas en español que\n// usa nuestro esquema (columna severity_label: Crítica | Alta | Media | Baja | Ninguna).\nconst THREAT_TO_LABEL = {\n  Critical: 'Crítica',\n  High: 'Alta',\n  Medium: 'Media',\n  Low: 'Baja',\n  Log: 'Ninguna',\n  Debug: 'Ninguna',\n};\n\nconst CVE_REGEX = /CVE-\\d{4}-\\d+/g;\n\nfunction extraerTag(tagsString, clave) {\n  // El campo \"tags\" de un NVT viene como pares clave=valor separados por \"|\",\n  // ej: \"summary=...|insight=...|solution=...\". Convención documentada por\n  // Greenbone; no hay subelementos separados para cada una en get_reports.\n  if (!tagsString) return null;\n  const partes = tagsString.split('|');\n  for (const parte of partes) {\n    const idx = parte.indexOf('=');\n    if (idx === -1) continue;\n    const k = parte.slice(0, idx).trim();\n    const v = parte.slice(idx + 1).trim();\n    if (k === clave) return v || null;\n  }\n  return null;\n}\n\nfunction extraerHostIp(hostNode) {\n  // Contenido mixto real: texto (IP) + <asset/> + <hostname>. xml2js deja el\n  // texto bajo \"_\" cuando hay hijos. Si algún día no hubiera hijos (como\n  // asumía el mock), r.host[0] sería directamente el string — se contempla\n  // igual por robustez.\n  if (hostNode == null) return null;\n  if (typeof hostNode === 'string') return hostNode;\n  return hostNode._ ?? null;\n}\n\nfunction extraerCves(tagsString) {\n  const insight = extraerTag(tagsString, 'insight') ?? '';\n  const matches = insight.match(CVE_REGEX);\n  return matches ? [...new Set(matches)] : [];\n}\n\nconst scanId = $('Insert Scan History').first().json.id;\nif (scanId === undefined || scanId === null) {\n  throw new Error('No se pudo obtener el scan_id del nodo \"Insert Scan History\".');\n}\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const rawXml = item.json.stdout;\n\n  if (!rawXml) {\n    throw new Error('El item no contiene stdout con el XML de get_reports. Verificar el nodo \"GMP Get Reports\" anterior.');\n  }\n\n  let parsed;\n  try {\n    parsed = await parseStringPromise(rawXml, { explicitArray: true });\n  } catch (err) {\n    throw new Error(`No se pudo parsear el XML de get_reports: ${err.message}. Fragmento: ${rawXml.slice(0, 300)}`);\n  }\n\n  const reportResults =\n    parsed?.get_reports_response?.report?.[0]?.report?.[0]?.results?.[0]?.result ?? [];\n\n  if (reportResults.length === 0) {\n    // 0 hallazgos es un resultado válido (target sin vulnerabilidades\n    // detectadas), no un error — no se inserta nada, se sigue el flujo.\n    continue;\n  }\n\n  for (const r of reportResults) {\n    const hostIp = extraerHostIp(r?.host?.[0]);\n    // formato normal \"80/tcp\"; pero también aparece \"general/tcp\",\n    // \"general/icmp\", \"general/CPE-T\" para hallazgos a nivel de host/SO,\n    // no atados a un puerto real (ej. detección de sistema operativo).\n    // HALLAZGO real (22/08/2026): Number(\"general\") da NaN, que al\n    // serializarse a JSON se convierte en null silenciosamente, y ese null\n    // terminaba llegando a Postgres como el TEXTO \"null\" en vez de un NULL\n    // real, rompiendo el INSERT en la columna entera port. Se detecta\n    // explícitamente con Number.isInteger en vez de confiar en el ternario.\n    const portRaw = r?.port?.[0] ?? null;\n    let portNum = null;\n    let protocol = null;\n    if (portRaw) {\n      const [portPart, protoPart] = portRaw.split('/');\n      const parsedPort = Number(portPart);\n      portNum = Number.isInteger(parsedPort) ? parsedPort : null;\n      protocol = protoPart ?? null;\n    }\n\n    const nvt = r?.nvt?.[0] ?? {};\n    const tags = nvt?.tags?.[0] ?? null;\n\n    const threat = r?.threat?.[0] ?? 'Log';\n    const severityScore = Number(r?.severity?.[0] ?? 0);\n    const description = extraerTag(tags, 'summary') ?? r?.description?.[0] ?? null;\n    const solution = extraerTag(tags, 'solution') ?? null;\n\n    const baseFields = {\n      hostIp,\n      port: portNum,\n      protocol,\n      severityScore,\n      severityLabel: THREAT_TO_LABEL[threat] ?? 'Ninguna',\n      description,\n      solution,\n      scanId,\n    };\n\n    const cves = extraerCves(tags);\n\n    if (cves.length > 0) {\n      for (const cveId of cves) {\n        results.push({ json: { ...baseFields, cveId } });\n      }\n    } else if (threat !== 'Log') {\n      results.push({ json: { ...baseFields, cveId: null } });\n    }\n    // threat === 'Log' sin CVE: se descarta (ver comentario del encabezado).\n  }\n}\n\nreturn results;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -634,85 +444,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Reduce a un único item antes de la consulta SELECT, para que el nodo\n// Postgres siguiente ejecute la query una sola vez (no una vez por fila\n// insertada).\n//\n// Ajuste Fase 2d: se lee el scan_id por nombre de nodo (\"Insert Scan\n// History\"), no de $input — así sigue funcionando aunque el nodo anterior\n// (\"GMP Insertar Hallazgos\") produzca 0 items (puede pasar si GVM no\n// encontró ningún hallazgo con CVE ni con threat distinto de Log).\nreturn [{ json: { scanId: $('Insert Scan History').first().json.id } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        8624,
-        2912
-      ],
-      "id": "6712ed7b-a8c5-4e6a-979c-3be80d0438c8",
-      "name": "Code in JavaScript"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM vulnerability_scans WHERE scan_id = $1 ORDER BY id;",
-        "options": {
-          "queryReplacement": "={{ $json.scanId }}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        8832,
-        2912
-      ],
-      "id": "21974a33-d924-4e5f-ad9b-ab848d589048",
-      "name": "Execute a SQL query",
-      "credentials": {
-        "postgres": {
-          "id": "cp6Ie0GU9AkhFLLL",
-          "name": "Postgres account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Nodo 8 — Generador del informe Markdown.\n//\n// Fix directo de C-07 y C-08 del dictamen: este código recorre el 100%\n// de las filas devueltas por la consulta a PostgreSQL (sin ningún límite\n// arbitrario tipo \"renderVulns(high, 5)\"), e incluye el inventario de\n// hosts que la tesis anterior prometía en el objetivo 6 pero el código\n// nunca generaba.\n//\n// ACTUALIZACIÓN (Fase 2d completa, ver docs/resultados-10-corridas-gvm.md):\n// GVM/Greenbone real ya está integrado. Los hallazgos con cve_id,\n// severity_score, severity_label, description y solution poblados son\n// correlaciones reales contra CVEs conocidos (no solo reconocimiento de\n// Nmap) — ver gvm-integration/hallazgo-estructura-real-get-reports.md\n// para el detalle completo de cómo se construyó el parseo real. El\n// código de este nodo no necesitó cambios estructurales para esto, tal\n// como se planeó desde el mock: solo se ajustaron los dos detalles reales\n// documentados más abajo (deduplicación de puertos, y el caso de filas de\n// GVM sin service_name propio).\n\nconst findings = $input.all().map((item) => item.json);\nconst summary = $('Resumen Scan History').first().json;\n\n// Fix (ver RUNBOOK-continuidad-post-fase2d.md, punto A.3): \"summary.finishedAt\"\n// se capturó apenas terminó Nmap, antes de que arrancara GVM — reflejaba\n// ~6s en vez de los ~14 minutos reales. Se sobreescribe acá con el\n// timestamp real, tomado después de que GVM terminó e insertó sus hallazgos.\nconst finReal = $('Actualizar Fin Real Scan History').first().json?.finished_at;\nif (finReal) summary.finishedAt = finReal;\n\nif (findings.length === 0) {\n  throw new Error('No se recibieron hallazgos desde la consulta a PostgreSQL. Verificar el nodo anterior.');\n}\n\n// --- Inventario de hosts (fix C-08: nunca implementado en la tesis anterior) ---\n//\n// HALLAZGO real (Fase 2d, 24/08/2026): con GVM insertando una fila por CADA\n// CVE (varias por puerto — ver decisión de diseño en\n// gvm-integration/hallazgo-estructura-real-get-reports.md), \"ports\" sin\n// deduplicar terminaba listando el mismo puerto decenas de veces (ej. \"80\"\n// repetido 70 veces). Se usa un Set para que cada puerto aparezca una sola\n// vez, sin perder la cuenta real de hallazgos (que sí cuenta cada fila).\nconst hostMap = new Map();\nfor (const f of findings) {\n  if (!hostMap.has(f.host_ip)) {\n    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: new Set() });\n  }\n  const entry = hostMap.get(f.host_ip);\n  entry.count += 1;\n  if (f.port != null) entry.ports.add(f.port);\n}\n\nlet hostInventory = '| Host (IP) | Hostname | Puertos detectados | Cant. hallazgos |\\n';\nhostInventory += '|---|---|---|---|\\n';\nfor (const [ip, data] of hostMap.entries()) {\n  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${[...data.ports].sort((a, b) => a - b).join(', ')} | ${data.count} |\\n`;\n}\n\n// --- Agrupación por severidad (si GVM ya la completó) o por servicio\n// (mientras tanto, con datos de reconocimiento de Nmap) ---\nconst hasSeverityData = findings.some((f) => f.severity_label);\n\nlet detailSection = '';\nif (hasSeverityData) {\n  // Etiquetas en español, consistentes con la columna severity_label del\n  // esquema (sql/init/01_schema.sql: \"Crítica | Alta | Media | Baja | Ninguna\")\n  // y con lo que produce workflow-nodes/nodo-gvm-parseo-mock.js. Se encontró\n  // y corrigió una inconsistencia real: esta versión anterior usaba etiquetas\n  // en inglés (Critical/High/Medium/Low), que nunca iban a coincidir con los\n  // datos reales — el mismo tipo de inconsistencia terminológica (OMP/GMP)\n  // que señaló el dictamen de auditoría, detectada acá antes de que llegara\n  // a la tesis.\n  const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };\n  for (const f of findings) {\n    const label = f.severity_label ?? 'Ninguna';\n    (bySeverity[label] ?? bySeverity.Ninguna).push(f);\n  }\n  for (const [label, items] of Object.entries(bySeverity)) {\n    if (items.length === 0) continue;\n    detailSection += `\\n### ${label} (${items.length})\\n\\n`;\n    for (const f of items) {\n      // Las filas que vienen de GVM (Fase 2d) no tienen service_name/\n      // service_version propio (solo lo captura Nmap) — se omite el\n      // paréntesis en vez de mostrar el feo \"— null (null)\".\n      const servicio = f.service_name\n        ? ` — ${f.service_name}${f.service_version ? ` (${f.service_version})` : ''}`\n        : '';\n      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}**${servicio}\\n`;\n      if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\\n`;\n      if (f.description) detailSection += `  - Descripción: ${f.description}\\n`;\n      if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\\n`;\n    }\n  }\n} else {\n  detailSection += `\\n### Hallazgos de reconocimiento (Nmap) — pendientes de correlación con GVM\\n\\n`;\n  detailSection += `> Estos ${findings.length} hallazgos provienen de la detección de servicios y versiones de Nmap. `;\n  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone, Fase 2d del proyecto). `;\n  detailSection += `No deben interpretarse como vulnerabilidades confirmadas.\\n\\n`;\n  for (const f of findings) {\n    detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name}: ${f.service_version}\\n`;\n  }\n}\n\n// --- Recomendaciones generales (fix C-08) ---\nconst recommendations = [\n  'Priorizar la remediación de los hallazgos de severidad Crítica y Alta con CVE conocido, confirmados por correlación real contra GVM/Greenbone.',\n  'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',\n  'Restringir el acceso de red a los puertos detectados únicamente a los hosts que efectivamente lo necesiten.',\n  'Repetir este escaneo de forma periódica para detectar desviaciones respecto de esta línea base.',\n];\n\nconst report = `# Informe de Escaneo de Red\n\n**ID de escaneo:** ${summary.scanUuid}\n**Rango/objetivo:** ${summary.targetRange}\n**Inicio:** ${summary.startedAt}\n**Fin:** ${summary.finishedAt}\n**Hosts analizados:** ${summary.hostCount}\n**Hallazgos totales:** ${findings.length} de ${findings.length} recuperados de la base de datos (correspondencia 1:1 verificada)\n\n## Inventario de hosts\n\n${hostInventory}\n\n## Detalle de hallazgos\n${detailSection}\n\n## Recomendaciones generales\n\n${recommendations.map((r) => `- ${r}`).join('\\n')}\n\n---\n*Informe generado automáticamente. Fuente de datos: tabla \\`vulnerability_scans\\`, scan_id = ${findings[0].scan_id}.*\n`;\n\nreturn [{ json: { reportMarkdown: report, findingCount: findings.length } }];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        9040,
-        2912
-      ],
-      "id": "1b9f4acc-904b-464b-83b2-1d1dfd11b31a",
-      "name": "Code in JavaScript1"
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "=/home/n8n/.n8n-files/informe_{{ $now.format('yyyy-MM-dd_HH-mm-ss') }}.md",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1.1,
-      "position": [
-        9456,
-        2912
-      ],
-      "id": "686ce631-cf85-4edc-bbc2-4398e5283cec",
-      "name": "Read/Write Files from Disk"
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "reportMarkdown",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        9248,
-        2912
-      ],
-      "id": "80998cee-3a0b-4fa4-a22c-873f7c9c6471",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE scan_history SET finished_at = NOW() WHERE id = $1 RETURNING finished_at;",
         "options": {
@@ -733,6 +464,275 @@
           "name": "Postgres account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reduce a un único item antes de la consulta SELECT, para que el nodo\n// Postgres siguiente ejecute la query una sola vez (no una vez por fila\n// insertada).\n//\n// Ajuste Fase 2d: se lee el scan_id por nombre de nodo (\"Insert Scan\n// History\"), no de $input — así sigue funcionando aunque el nodo anterior\n// (\"GMP Insertar Hallazgos\") produzca 0 items (puede pasar si GVM no\n// encontró ningún hallazgo con CVE ni con threat distinto de Log).\nreturn [{ json: { scanId: $('Insert Scan History').first().json.id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8624,
+        2912
+      ],
+      "id": "6712ed7b-a8c5-4e6a-979c-3be80d0438c8",
+      "name": "Reducir Hallazgos a un Item"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM vulnerability_scans WHERE scan_id = $1 ORDER BY id;",
+        "options": {
+          "queryReplacement": "={{ $json.scanId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        8832,
+        2912
+      ],
+      "id": "21974a33-d924-4e5f-ad9b-ab848d589048",
+      "name": "Consultar Hallazgos del Escaneo",
+      "credentials": {
+        "postgres": {
+          "id": "cp6Ie0GU9AkhFLLL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nodo 25 — Generar Informe Markdown.\n//\n// Recorre el 100% de las filas devueltas por la consulta a PostgreSQL, sin ningún límite\n// arbitrario sobre la cantidad de resultados mostrados, e incluye el inventario de hosts\n// declarado en el Objetivo Específico 6.\n//\n// Estado actual: GVM/Greenbone real ya está integrado (ver\n// docs/resultados-10-corridas-gvm.md). Los hallazgos con cve_id,\n// severity_score, severity_label, description y solution poblados son\n// correlaciones reales contra CVEs conocidos (no solo reconocimiento de\n// Nmap) — ver gvm-integration/hallazgo-estructura-real-get-reports.md\n// para el detalle completo de cómo se construyó el parseo real. El\n// código de este nodo no necesitó cambios estructurales para esto, tal\n// como se planeó desde el mock: solo se ajustaron los dos detalles reales\n// documentados más abajo (deduplicación de puertos, y el caso de filas de\n// GVM sin service_name propio).\n\nconst findings = $input.all().map((item) => item.json);\nconst summary = $('Resumen Scan History').first().json;\n\n// El campo summary.finishedAt se capturaba apenas terminaba Nmap,\n// antes de que arrancara GVM — reflejaba ~6s en vez de los ~14 minutos reales.\n// Se sobreescribe acá con el timestamp real, tomado después de que GVM terminó e\n// insertó sus hallazgos.\nconst finReal = $('Actualizar Fin Real Scan History').first().json?.finished_at;\nif (finReal) summary.finishedAt = finReal;\n\nif (findings.length === 0) {\n  throw new Error('No se recibieron hallazgos desde la consulta a PostgreSQL. Verificar el nodo anterior.');\n}\n\n// --- Inventario de hosts, declarado en el Objetivo Específico 6 ---\n//\n// HALLAZGO real (24/08/2026): con GVM insertando una fila por CADA CVE\n// (varias por puerto), \"ports\" sin deduplicar terminaba listando el mismo\n// puerto decenas de veces (ej. \"80\" repetido 70 veces).\n// Se usa un Set para que cada puerto aparezca una sola\n// vez, sin perder la cuenta real de hallazgos (que sí cuenta cada fila).\nconst hostMap = new Map();\nfor (const f of findings) {\n  if (!hostMap.has(f.host_ip)) {\n    hostMap.set(f.host_ip, { hostname: f.hostname, count: 0, ports: new Set() });\n  }\n  const entry = hostMap.get(f.host_ip);\n  entry.count += 1;\n  if (f.port != null) entry.ports.add(f.port);\n}\n\nlet hostInventory = '| Host (IP) | Hostname | Puertos detectados | Cant. hallazgos |\\n';\nhostInventory += '|---|---|---|---|\\n';\nfor (const [ip, data] of hostMap.entries()) {\n  hostInventory += `| ${ip} | ${data.hostname ?? 'N/D'} | ${[...data.ports].sort((a, b) => a - b).join(', ')} | ${data.count} |\\n`;\n}\n\n// --- Agrupación por severidad (si GVM ya la completó) o por servicio\n// (mientras tanto, con datos de reconocimiento de Nmap) ---\nconst hasSeverityData = findings.some((f) => f.severity_label);\n\nlet detailSection = '';\nif (hasSeverityData) {\n  // Etiquetas en español, consistentes con la columna severity_label del\n  // esquema (sql/init/01_schema.sql: \"Crítica | Alta | Media | Baja | Ninguna\")\n  // y con lo que produce workflow-nodes/nodo-gvm-parseo-mock.js. Se encontró\n  // y corrigió una inconsistencia real: esta versión anterior usaba etiquetas\n  // en inglés (Critical/High/Medium/Low), que nunca iban a coincidir con los\n  // datos reales — el mismo tipo de inconsistencia terminológica (OMP/GMP)\n  // ya corregida de forma consistente en todo este documento.\n  const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };\n  for (const f of findings) {\n    const label = f.severity_label ?? 'Ninguna';\n    (bySeverity[label] ?? bySeverity.Ninguna).push(f);\n  }\n  for (const [label, items] of Object.entries(bySeverity)) {\n    if (items.length === 0) continue;\n    detailSection += `\\n### ${label} (${items.length})\\n\\n`;\n    for (const f of items) {\n      // Las filas que vienen de GVM no tienen service_name/\n      // service_version propio (solo lo captura Nmap) — se omite el\n      // paréntesis en vez de mostrar el feo \"— null (null)\".\n      const servicio = f.service_name\n        ? ` — ${f.service_name}${f.service_version ? ` (${f.service_version})` : ''}`\n        : '';\n      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}**${servicio}\\n`;\n      if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\\n`;\n      if (f.description) detailSection += `  - Descripción: ${f.description}\\n`;\n      if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\\n`;\n    }\n  }\n} else {\n  detailSection += `\\n### Hallazgos de reconocimiento (Nmap) — pendientes de correlación con GVM\\n\\n`;\n  detailSection += `> Estos ${findings.length} hallazgos provienen de la detección de servicios y versiones de Nmap. `;\n  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone). `;\n  detailSection += `No deben interpretarse como vulnerabilidades confirmadas.\\n\\n`;\n  for (const f of findings) {\n    detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name}: ${f.service_version}\\n`;\n  }\n}\n\n// --- Recomendaciones generales de remediación ---\nconst recommendations = [\n  'Priorizar la remediación de los hallazgos de severidad Crítica y Alta con CVE conocido, confirmados por correlación real contra GVM/Greenbone.',\n  'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',\n  'Restringir el acceso de red a los puertos detectados únicamente a los hosts que efectivamente lo necesiten.',\n  'Repetir este escaneo de forma periódica para detectar desviaciones respecto de esta línea base.',\n];\n\nconst report = `# Informe de Escaneo de Red\n\n**ID de escaneo:** ${summary.scanUuid}\n**Rango/objetivo:** ${summary.targetRange}\n**Inicio:** ${summary.startedAt}\n**Fin:** ${summary.finishedAt}\n**Hosts analizados:** ${summary.hostCount}\n**Hallazgos totales:** ${findings.length} de ${findings.length} recuperados de la base de datos (correspondencia 1:1 verificada)\n\n## Inventario de hosts\n\n${hostInventory}\n\n## Detalle de hallazgos\n${detailSection}\n\n## Recomendaciones generales\n\n${recommendations.map((r) => `- ${r}`).join('\\n')}\n\n---\n*Informe generado automáticamente. Fuente de datos: tabla \\`vulnerability_scans\\`, scan_id = ${findings[0].scan_id}.*\n`;\n\nreturn [{ json: { reportMarkdown: report, findingCount: findings.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9040,
+        2912
+      ],
+      "id": "1b9f4acc-904b-464b-83b2-1d1dfd11b31a",
+      "name": "Generar Informe Markdown"
+    },
+    {
+      "parameters": {
+        "command": "nmap -sV -oX - target1"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        7296,
+        2912
+      ],
+      "id": "6dae5d82-c6ed-4328-a25f-5900a2d4aca1",
+      "name": "Ejecutar Escaneo Nmap"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "vulnerability_scans",
+          "mode": "list",
+          "cachedResultName": "vulnerability_scans"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "severity_score": 0,
+            "service_version": "={{ $json.serviceProduct }} {{ $json.serviceVersion }}{{ $json.serviceExtraInfo ? ' (' + $json.serviceExtraInfo + ')' : '' }}",
+            "service_name": "={{ $json.serviceName }}",
+            "protocol": "={{ $json.protocol }}",
+            "port": "={{ $json.port }}",
+            "hostname": "={{ $json.hostname }}",
+            "host_ip": "={{ $json.hostIp }}",
+            "scan_id": "={{ $json.scanId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "scan_id",
+              "displayName": "scan_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "host_ip",
+              "displayName": "host_ip",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hostname",
+              "displayName": "hostname",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "port",
+              "displayName": "port",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "protocol",
+              "displayName": "protocol",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_name",
+              "displayName": "service_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_version",
+              "displayName": "service_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cve_id",
+              "displayName": "cve_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity_score",
+              "displayName": "severity_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity_label",
+              "displayName": "severity_label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "solution",
+              "displayName": "solution",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detected_at",
+              "displayName": "detected_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        8416,
+        2912
+      ],
+      "id": "1f79c6a1-40af-4c2c-959c-e28021102a5b",
+      "name": "Insertar Hallazgos de Nmap",
+      "credentials": {
+        "postgres": {
+          "id": "cp6Ie0GU9AkhFLLL",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/n8n/.n8n-files/informe_{{ $now.format('yyyy-MM-dd_HH-mm-ss') }}.md",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        9456,
+        2912
+      ],
+      "id": "686ce631-cf85-4edc-bbc2-4398e5283cec",
+      "name": "Guardar Informe en Disco"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "reportMarkdown",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        9248,
+        2912
+      ],
+      "id": "80998cee-3a0b-4fa4-a22c-873f7c9c6471",
+      "name": "Convertir Informe a Archivo"
     }
   ],
   "pinData": {},
@@ -741,18 +741,7 @@
       "main": [
         [
           {
-            "node": "Execute Command",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Execute Command": {
-      "main": [
-        [
-          {
-            "node": "Parsear XML Nmap",
+            "node": "Ejecutar Escaneo Nmap",
             "type": "main",
             "index": 0
           }
@@ -796,18 +785,7 @@
       "main": [
         [
           {
-            "node": "Insert rows in a table",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert rows in a table": {
-      "main": [
-        [
-          {
-            "node": "Reducir a un item antes de GMP",
+            "node": "Insertar Hallazgos de Nmap",
             "type": "main",
             "index": 0
           }
@@ -968,51 +946,7 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript": {
-      "main": [
-        [
-          {
-            "node": "Execute a SQL query",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Execute a SQL query": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript1": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert to File": {
-      "main": [
-        [
-          {
-            "node": "Read/Write Files from Disk",
+            "node": "Reducir Hallazgos a un Item",
             "type": "main",
             "index": 0
           }
@@ -1029,6 +963,72 @@
           }
         ]
       ]
+    },
+    "Reducir Hallazgos a un Item": {
+      "main": [
+        [
+          {
+            "node": "Consultar Hallazgos del Escaneo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Hallazgos del Escaneo": {
+      "main": [
+        [
+          {
+            "node": "Generar Informe Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Informe Markdown": {
+      "main": [
+        [
+          {
+            "node": "Convertir Informe a Archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar Escaneo Nmap": {
+      "main": [
+        [
+          {
+            "node": "Parsear XML Nmap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Hallazgos de Nmap": {
+      "main": [
+        [
+          {
+            "node": "Reducir a un item antes de GMP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir Informe a Archivo": {
+      "main": [
+        [
+          {
+            "node": "Guardar Informe en Disco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1037,10 +1037,9 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "b7554ec5-234a-434a-844a-3963c5f74a60",
+  "versionId": "176015a6-5612-460b-9a07-4ab43804ac46",
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "122080e42c891a490172f6627ff5c2edf43bcabf10b23ce70ca5880307ddd934"
+    "templateCredsSetupCompleted": true
   },
   "id": "B52eboXOnz75mbOp",
   "tags": []

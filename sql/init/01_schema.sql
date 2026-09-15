@@ -11,7 +11,7 @@
 --                        hacia scan_history. Es la tabla que el nodo
 --                        generador de informes recorre al 100% (sin
 --                        truncar), y sobre la que corre la consulta de
---                        validación cruzada de la Fase 5.
+--                        validación cruzada de integridad de datos (sección 13.4).
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS scan_history (

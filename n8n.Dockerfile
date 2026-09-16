@@ -31,8 +31,8 @@ FROM node:20-alpine
 #   siempre, se usen scripts explícitos o no.
 # - tzdata: para que GENERIC_TIMEZONE/TZ funcionen correctamente en n8n.
 # - python3, py3-pip: a diferencia de la v1 de este archivo, ahora
-#   quedan en la imagen final (no son solo build-deps) porque la
-#   Fase 2d (GVM) necesita ejecutar "gvm-cli" (de gvm-tools, un paquete
+#   quedan en la imagen final (no son solo build-deps) porque el ciclo
+#   GMP/GVM necesita ejecutar "gvm-cli" (de gvm-tools, un paquete
 #   de Python) en runtime desde el nodo "Execute Command", igual que ya
 #   se hace con Nmap.
 # - make, g++, libffi-dev, openssl-dev: build-deps. Necesarios solo por

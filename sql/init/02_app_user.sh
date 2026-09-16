@@ -5,10 +5,8 @@
 # SELECT, INSERT y UPDATE. Sin DELETE, DROP ni ALTER: si algo en el
 # workflow falla o se ejecuta mal, no puede borrar ni destruir el esquema.
 #
-# Este es exactamente el tipo de buena práctica que el dictamen de
-# auditoría reconoció como acierto en la tesis anterior (ver 3.4,
-# "Lo que está bien documentado") — la mantenemos desde el diseño inicial
-# en vez de agregarla después.
+# Se aplica desde el diseño inicial del esquema, no como un agregado
+# posterior.
 #
 # Se ejecuta automáticamente la primera vez que se crea el volumen de
 # datos de Postgres (los scripts en /docker-entrypoint-initdb.d/ corren

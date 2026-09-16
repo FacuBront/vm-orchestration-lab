@@ -29,8 +29,8 @@ corregir la estructura de parseo contra los datos reales (ver arriba).
 
 - GMP es un protocolo **con estado**, sobre una conexión persistente (socket Unix por defecto en
   Community Edition: `/run/gvmd/gvmd.sock`; o TCP/TLS legado en el puerto 9390). **No es REST y
-  no usa un token de sesión en cabeceras** — a diferencia de lo que documentaba la tesis anterior
-  (`X-OMP-Session`), que confundía GMP con la API de la interfaz web (GSA).
+  no usa un token de sesión en cabeceras** (`X-OMP-Session`) — ese patrón corresponde a la API de
+  la interfaz web (GSA), un componente distinto de GMP con el que suele confundirse.
   - Fuentes: [GOS Manual - Using GMP](https://docs.greenbone.net/GSM-Manual/gos-24.10/en/gmp.html),
     [gvm-tools - Connection Types](https://greenbone.github.io/gvm-tools/connectiontypes.html),
     [python-gvm - Usage](https://greenbone.github.io/python-gvm/usage.html)

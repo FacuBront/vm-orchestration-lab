@@ -33,10 +33,10 @@
 # completo el paso de "sed" para esta versión.
 #
 # Ventaja metodológica adicional: al controlar exactamente qué versión de
-# cada servicio se instaló, en la Fase 5 vamos a poder contrastar los
-# hallazgos reportados por el escáner contra la lista de vulnerabilidades
-# deliberadamente instaladas — el control cruzado que el dictamen de
-# auditoría señaló como ausente en la tesis anterior.
+# cada servicio se instaló, se puede contrastar los hallazgos reportados
+# por el escáner contra la lista de vulnerabilidades deliberadamente
+# instaladas — la validación cruzada de falsos positivos y negativos que
+# desarrolla el capítulo de Discusión.
 # -----------------------------------------------------------------------------
 
 FROM ubuntu:18.04

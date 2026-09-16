@@ -1,10 +1,12 @@
 # -----------------------------------------------------------------------------
-# Laboratorio de Orquestación de Gestión de Vulnerabilidades - Fase 2b
+# Laboratorio de Orquestación de Gestión de Vulnerabilidades.
 #
-# Estado actual: n8n (con Nmap embebido) + PostgreSQL. El contenedor
-# objetivo de prueba se agrega en el próximo paso (Fase 2c).
-# GVM/Greenbone queda pendiente hasta contar con una máquina con RAM
-# suficiente (ver Fase 2d en el plan de trabajo).
+# Este archivo levanta el orquestador (n8n con Nmap embebido), la base de
+# datos (PostgreSQL) y el objetivo de prueba (target1). El motor de
+# evaluación de vulnerabilidades (GVM/Greenbone) vive en un archivo de
+# composición aparte, docker-compose.gvm.yml, por el tamaño y la cantidad
+# de contenedores que agrega — ver ese archivo y el README para levantar
+# el stack completo.
 # -----------------------------------------------------------------------------
 
 services:
@@ -55,13 +57,13 @@ services:
     ports:
       - "5678:5678"
     environment:
-      # --- Fix directo a C-05 del dictamen ---
+      # --- Habilitación explícita de módulos en los nodos de código ---
       # Sin estas dos variables, n8n bloquea require('xml2js'), require('fs'),
       # etc. dentro de los nodos Code, y el pipeline entero queda inutilizable.
       - NODE_FUNCTION_ALLOW_EXTERNAL=xml2js,axios,https,fs
       - NODE_FUNCTION_ALLOW_BUILTIN=*
 
-      # --- Fix a hallazgo descubierto en vivo (documentar en la tesis) ---
+      # --- Reactivación selectiva de nodos restringidos por defecto ---
       # n8n v2 deshabilita por defecto dos nodos por riesgo de RCE (ejecución
       # remota de código): "executeCommand" y "localFileTrigger". Se
       # verificó leyendo el código fuente instalado
@@ -83,11 +85,11 @@ services:
       # porque el Dockerfile v2 crea un usuario propio "n8n" (ver
       # n8n.Dockerfile), no el usuario "node" de la imagen oficial.
       - n8n_data:/home/n8n/.n8n
-      # Fix a un hallazgo puntual del dictamen: el informe generado por
-      # el Nodo 8 ya NO se escribe en /tmp del contenedor (se perdía al
-      # recrearlo). Bind mount a una carpeta real del proyecto.
+      # El informe generado por el nodo de cierre no se escribe en /tmp del
+      # contenedor (se perdía al recrearlo). Bind mount a una carpeta real
+      # del proyecto.
       #
-      # NOTA TÉCNICA (documentar en la tesis): se descubrió en vivo que
+      # NOTA TÉCNICA: se descubrió en vivo que
       # n8n v2 restringe por defecto los nodos de archivo a escribir
       # únicamente dentro de ~/.n8n-files (variable de entorno
       # N8N_RESTRICT_FILE_ACCESS_TO, verificado en

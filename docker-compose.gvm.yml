@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Fase 2d: stack de GVM/Greenbone Community Edition.
+# Stack de GVM/Greenbone Community Edition.
 #
 # Copiado 1:1 (mismas imágenes, mismos volúmenes, mismo orden de
 # dependencias) del docker-compose oficial de Greenbone, descargado en vivo

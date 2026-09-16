@@ -228,15 +228,14 @@ La secuencia real de comandos GMP a construir como nodos "Execute Command" (cada
 justificación de por qué este patrón y no una conexión persistente):
 
 1. `create_target` (apuntando a `target1`, IP `172.28.0.20`) → capturar el `target_id` de la
-   respuesta **explícitamente en un nodo Code**, no asumir que se puede "arrastrar" solo (esto
-   es exactamente el hallazgo C-06 del dictamen original — un ID que se genera y nunca se
-   captura correctamente rompe toda la cadena).
+   respuesta **explícitamente en un nodo Code**, no asumir que se puede "arrastrar" solo (un ID
+   que se genera y nunca se captura correctamente rompe toda la cadena).
 2. `create_task` (usando el `target_id` del paso anterior) → capturar `task_id`.
 3. `start_task` (usando `task_id`) → capturar el `report_id` que devuelve al iniciar (o
    confirmar cómo se obtiene según la versión real de GMP).
 4. Esperar a que el escaneo termine. **Investigar la forma correcta de esperar/consultar
-   progreso** en vez de un tiempo fijo arbitrario (la tesis anterior fue criticada exactamente
-   por esto — un `Wait` fijo sin justificar, con doble contabilización de tiempos). Alternativas
+   progreso** en vez de un tiempo fijo arbitrario — un `Wait` fijo sin justificar no tiene forma
+   de adaptarse a la duración real de una evaluación de GVM. Alternativas
    a evaluar: nodo `Wait` de n8n + polling con `get_tasks` consultando el status, hasta ver
    `Done`.
 5. `get_reports` (usando `report_id`) → el XML real de resultados.

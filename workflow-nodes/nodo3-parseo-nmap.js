@@ -1,5 +1,5 @@
 // Nodo 3 — Parseo del XML de Nmap.
-// Fix de hallazgos del dictamen: try/catch real, parseStringPromise
+// Manejo de errores real: try/catch real, parseStringPromise
 // (async, no callback), encadenamiento opcional en todo acceso a campos
 // que pueden no existir (evita que un host "raro" tire abajo el nodo).
 // v2: agrega los timestamps reales del escaneo (tomados del propio XML

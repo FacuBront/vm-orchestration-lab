@@ -1,13 +1,11 @@
-// Nodo 8 — Generador del informe Markdown.
+// Nodo 25 — Generar Informe Markdown.
 //
-// Fix directo de C-07 y C-08 del dictamen: este código recorre el 100%
-// de las filas devueltas por la consulta a PostgreSQL (sin ningún límite
-// arbitrario tipo "renderVulns(high, 5)"), e incluye el inventario de
-// hosts que la tesis anterior prometía en el objetivo 6 pero el código
-// nunca generaba.
+// Recorre el 100% de las filas devueltas por la consulta a PostgreSQL, sin ningún límite
+// arbitrario sobre la cantidad de resultados mostrados, e incluye el inventario de hosts
+// declarado en el Objetivo Específico 6.
 //
-// ACTUALIZACIÓN (Fase 2d completa, ver docs/resultados-10-corridas-gvm.md):
-// GVM/Greenbone real ya está integrado. Los hallazgos con cve_id,
+// Estado actual: GVM/Greenbone real ya está integrado (ver
+// docs/resultados-10-corridas-gvm.md). Los hallazgos con cve_id,
 // severity_score, severity_label, description y solution poblados son
 // correlaciones reales contra CVEs conocidos (no solo reconocimiento de
 // Nmap) — ver gvm-integration/hallazgo-estructura-real-get-reports.md
@@ -20,10 +18,10 @@
 const findings = $input.all().map((item) => item.json);
 const summary = $('Resumen Scan History').first().json;
 
-// Fix (ver RUNBOOK-continuidad-post-fase2d.md, punto A.3): "summary.finishedAt"
-// se capturó apenas terminó Nmap, antes de que arrancara GVM — reflejaba
-// ~6s en vez de los ~14 minutos reales. Se sobreescribe acá con el
-// timestamp real, tomado después de que GVM terminó e insertó sus hallazgos.
+// El campo summary.finishedAt se capturaba apenas terminaba Nmap,
+// antes de que arrancara GVM — reflejaba ~6s en vez de los ~14 minutos reales.
+// Se sobreescribe acá con el timestamp real, tomado después de que GVM terminó e
+// insertó sus hallazgos.
 const finReal = $('Actualizar Fin Real Scan History').first().json?.finished_at;
 if (finReal) summary.finishedAt = finReal;
 
@@ -31,13 +29,12 @@ if (findings.length === 0) {
   throw new Error('No se recibieron hallazgos desde la consulta a PostgreSQL. Verificar el nodo anterior.');
 }
 
-// --- Inventario de hosts (fix C-08: nunca implementado en la tesis anterior) ---
+// --- Inventario de hosts, declarado en el Objetivo Específico 6 ---
 //
-// HALLAZGO real (Fase 2d, 24/08/2026): con GVM insertando una fila por CADA
-// CVE (varias por puerto — ver decisión de diseño en
-// gvm-integration/hallazgo-estructura-real-get-reports.md), "ports" sin
-// deduplicar terminaba listando el mismo puerto decenas de veces (ej. "80"
-// repetido 70 veces). Se usa un Set para que cada puerto aparezca una sola
+// HALLAZGO real (24/08/2026): con GVM insertando una fila por CADA CVE
+// (varias por puerto), "ports" sin deduplicar terminaba listando el mismo
+// puerto decenas de veces (ej. "80" repetido 70 veces).
+// Se usa un Set para que cada puerto aparezca una sola
 // vez, sin perder la cuenta real de hallazgos (que sí cuenta cada fila).
 const hostMap = new Map();
 for (const f of findings) {
@@ -62,13 +59,12 @@ const hasSeverityData = findings.some((f) => f.severity_label);
 let detailSection = '';
 if (hasSeverityData) {
   // Etiquetas en español, consistentes con la columna severity_label del
-  // esquema (sql/init/01_schema.sql: "Crítica | Alta | Media | Baja | Ninguna")
-  // y con lo que produce workflow-nodes/nodo-gvm-parseo-mock.js. Se encontró
-  // y corrigió una inconsistencia real: esta versión anterior usaba etiquetas
-  // en inglés (Critical/High/Medium/Low), que nunca iban a coincidir con los
-  // datos reales — el mismo tipo de inconsistencia terminológica (OMP/GMP)
-  // que señaló el dictamen de auditoría, detectada acá antes de que llegara
-  // a la tesis.
+  // esquema (sql/init/01_schema.sql: "Crítica | Alta | Media | Baja | Ninguna").
+  // Se corrigió aquí una inconsistencia real: una implementación temprana de
+  // este nodo usaba etiquetas en inglés (Critical/High/Medium/Low), que nunca
+  // habrían coincidido con los valores reales de severity_label persistidos
+  // por GVM. El resultado habría sido que ningún hallazgo se agrupara
+  // correctamente por severidad, sin ningún error visible que lo advirtiera.
   const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };
   for (const f of findings) {
     const label = f.severity_label ?? 'Ninguna';
@@ -78,13 +74,14 @@ if (hasSeverityData) {
     if (items.length === 0) continue;
     detailSection += `\n### ${label} (${items.length})\n\n`;
     for (const f of items) {
-      // Las filas que vienen de GVM (Fase 2d) no tienen service_name/
+      // Las filas que vienen de GVM no tienen service_name/
       // service_version propio (solo lo captura Nmap) — se omite el
       // paréntesis en vez de mostrar el feo "— null (null)".
       const servicio = f.service_name
         ? ` — ${f.service_name}${f.service_version ? ` (${f.service_version})` : ''}`
         : '';
-      detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}**${servicio}\n`;
+      const portLabel = f.port != null ? f.port : 'general';
+      detailSection += `- **${f.host_ip}:${portLabel}/${f.protocol}**${servicio}\n`;
       if (f.cve_id) detailSection += `  - CVE: ${f.cve_id}\n`;
       if (f.description) detailSection += `  - Descripción: ${f.description}\n`;
       if (f.solution) detailSection += `  - Solución recomendada: ${f.solution}\n`;
@@ -93,14 +90,14 @@ if (hasSeverityData) {
 } else {
   detailSection += `\n### Hallazgos de reconocimiento (Nmap) — pendientes de correlación con GVM\n\n`;
   detailSection += `> Estos ${findings.length} hallazgos provienen de la detección de servicios y versiones de Nmap. `;
-  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone, Fase 2d del proyecto). `;
+  detailSection += `Todavía no fueron correlacionados contra una base de datos de CVE (GVM/Greenbone). `;
   detailSection += `No deben interpretarse como vulnerabilidades confirmadas.\n\n`;
   for (const f of findings) {
     detailSection += `- **${f.host_ip}:${f.port}/${f.protocol}** — ${f.service_name}: ${f.service_version}\n`;
   }
 }
 
-// --- Recomendaciones generales (fix C-08) ---
+// --- Recomendaciones generales de remediación ---
 const recommendations = [
   'Priorizar la remediación de los hallazgos de severidad Crítica y Alta con CVE conocido, confirmados por correlación real contra GVM/Greenbone.',
   'Mantener actualizado el software de cada servicio detectado a su versión estable más reciente.',
@@ -115,7 +112,7 @@ const report = `# Informe de Escaneo de Red
 **Inicio:** ${summary.startedAt}
 **Fin:** ${summary.finishedAt}
 **Hosts analizados:** ${summary.hostCount}
-**Hallazgos totales:** ${findings.length} de ${findings.length} recuperados de la base de datos (correspondencia 1:1 verificada)
+**Hallazgos totales:** ${findings.length} recuperados de la base de datos
 
 ## Inventario de hosts
 

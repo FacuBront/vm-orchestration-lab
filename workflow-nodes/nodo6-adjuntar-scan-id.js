@@ -2,9 +2,9 @@
 // History") a cada hallazgo individual, antes de insertarlos en
 // vulnerability_scans.
 //
-// Fix directo del hallazgo C-06 del dictamen: en la tesis anterior, un
-// nodo generaba un taskId que ningún nodo posterior capturaba
-// explícitamente, rompiendo la cadena de datos. Acá el ID se recupera
+// Un identificador generado en un nodo puede perderse si ningún nodo
+// posterior lo captura explícitamente, rompiendo la cadena de datos.
+// Acá el ID se recupera
 // por nombre de nodo (mecanismo nativo de n8n, no un objeto inventado) y
 // se propaga a cada item sin pérdida.
 

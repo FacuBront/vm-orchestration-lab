@@ -1,6 +1,6 @@
-// Nodo de parseo GVM/GMP — VERSIÓN REAL, contra una instancia de GVM/Greenbone
-// de verdad (Fase 2d). Copiado de nodo-gvm-parseo-mock.js y corregido contra
-// la respuesta real de gvmd 26.36.1 / GVM 22.7 (ver
+// Nodo de parseo GVM/GMP — VERSIÓN REAL, contra una instancia real de
+// GVM/Greenbone, no contra datos simulados. Corregido contra la respuesta
+// real de gvmd 26.36.1 / GVM 22.7. (ver
 // gvm-integration/hallazgo-estructura-real-get-reports.md para el detalle
 // completo y el XML de ejemplo real).
 //
@@ -24,8 +24,7 @@
 // truncar datos. Se decidió INSERTAR una fila nueva por cada CVE encontrado,
 // dejando la fila original de Nmap intacta como reconocimiento base. Menos
 // prolijo que 1 fila por puerto, pero consistente con el principio del repo
-// de no truncar resultados (evita repetir los hallazgos C-07/C-08 del
-// dictamen original).
+// de no truncar resultados.
 //
 // Resultados sin ningún CVE en el texto:
 //   - threat === 'Log' (ruido puramente informativo, ej. banners de detección

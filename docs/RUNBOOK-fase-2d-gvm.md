@@ -49,10 +49,10 @@ diagnóstico si algo falla más adelante.
 
 ## 0. Por qué este documento es así (leer antes de todo)
 
-Este proyecto es la reconstrucción de una tesis de grado (UTN-FRM) que fue auditada con 3,9/10
-por documentar un sistema que nunca se probó de verdad: puertos inventados, protocolos
-confundidos, objetos de código que no existen, informes que mentían sobre sus propios datos. La
-regla de trabajo de todo este repositorio, sin excepciones, es:
+Este proyecto es la implementación de laboratorio de una tesis de grado (UTN-FRM). Documentar un
+sistema que nunca se probó de verdad lleva a puertos inventados, protocolos confundidos, objetos
+de código que no existen e informes que mienten sobre sus propios datos. Por eso la regla de
+trabajo de todo este repositorio, sin excepciones, es:
 
 > **No se documenta ni se declara terminado nada que no se haya ejecutado y verificado con
 > evidencia real primero.**

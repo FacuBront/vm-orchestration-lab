@@ -3,8 +3,8 @@
 Paso 5 del runbook (`docs/RUNBOOK-fase-2d-gvm.md`). Pipeline completo (Nmap → GVM real → parseo →
 PostgreSQL → informe) ejecutado 10 veces consecutivas contra `target1`, sin cambios entre
 corridas. Objetivo: medir con evidencia real si el tiempo de escaneo varía entre corridas
-idénticas, y si la cantidad de hallazgos se mantiene estable. Ver también la explicación de por
-qué se espera esto en la memoria de la sesión / el propio runbook.
+idénticas, y si la cantidad de hallazgos se mantiene estable. La explicación de por qué se
+espera esa variación está en la sección 5 del runbook.
 
 Datos crudos, tomados directamente de `scan_history` y de los timestamps reales del escaneo
 GVM (no estimados ni redondeados).

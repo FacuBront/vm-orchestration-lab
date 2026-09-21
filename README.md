@@ -5,16 +5,13 @@ Programación — UTN Facultad Regional Mendoza.
 
 ## Contexto
 
-Este repositorio es la reconstrucción **desde cero** de un proyecto de tesis que fue auditado
-con un dictamen de 3,9/10 (no recomendable para defensa). El dictamen detectó que el sistema
-documentado no podía funcionar en la realidad: contradicciones de red entre Docker y el host,
-protocolos mal identificados, código con objetos inventados (`$credentials`), informes que
-truncaban resultados arbitrariamente y una bibliografía en su mayoría no verificada.
+Este repositorio contiene el laboratorio que respalda la tesis: un entorno reproducible,
+construido **desde cero**, donde cada componente se ejecutó y se verificó antes de documentarse.
 
-La reconstrucción sigue un principio único: **no se documenta nada que no se haya ejecutado y
-verificado primero**. Cada decisión técnica de este repositorio, incluyendo los errores y sus
-correcciones, quedó registrada en el momento en que ocurrió (ver comentarios en el código y el
-historial de commits).
+El laboratorio sigue un principio único: **no se documenta nada que no se haya ejecutado y
+verificado primero**. Las decisiones técnicas y las correcciones que hicieron falta quedaron
+registradas en el momento en que ocurrieron (ver los comentarios del código y el historial de
+commits).
 
 ## Qué hace este pipeline
 

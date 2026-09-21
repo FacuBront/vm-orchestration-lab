@@ -31,7 +31,7 @@ if (findings.length === 0) {
 
 // --- Inventario de hosts, declarado en el Objetivo Específico 6 ---
 //
-// HALLAZGO real (24/08/2026): con GVM insertando una fila por CADA CVE
+// Caso real (24/08/2026): con GVM insertando una fila por CADA CVE
 // (varias por puerto), "ports" sin deduplicar terminaba listando el mismo
 // puerto decenas de veces (ej. "80" repetido 70 veces).
 // Se usa un Set para que cada puerto aparezca una sola
@@ -60,11 +60,9 @@ let detailSection = '';
 if (hasSeverityData) {
   // Etiquetas en español, consistentes con la columna severity_label del
   // esquema (sql/init/01_schema.sql: "Crítica | Alta | Media | Baja | Ninguna").
-  // Se corrigió aquí una inconsistencia real: una implementación temprana de
-  // este nodo usaba etiquetas en inglés (Critical/High/Medium/Low), que nunca
-  // habrían coincidido con los valores reales de severity_label persistidos
-  // por GVM. El resultado habría sido que ningún hallazgo se agrupara
-  // correctamente por severidad, sin ningún error visible que lo advirtiera.
+  // Con etiquetas en inglés (Critical/High/Medium/Low), ningún hallazgo
+  // coincidiría con los valores persistidos de severity_label, y no se
+  // agruparía por severidad sin ningún error visible que lo advirtiera.
   const bySeverity = { Crítica: [], Alta: [], Media: [], Baja: [], Ninguna: [] };
   for (const f of findings) {
     const label = f.severity_label ?? 'Ninguna';
@@ -130,3 +128,4 @@ ${recommendations.map((r) => `- ${r}`).join('\n')}
 `;
 
 return [{ json: { reportMarkdown: report, findingCount: findings.length } }];
+

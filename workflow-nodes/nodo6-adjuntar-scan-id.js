@@ -2,11 +2,11 @@
 // History") a cada hallazgo individual, antes de insertarlos en
 // vulnerability_scans.
 //
-// Un identificador generado en un nodo puede perderse si ningún nodo
-// posterior lo captura explícitamente, rompiendo la cadena de datos.
-// Acá el ID se recupera
-// por nombre de nodo (mecanismo nativo de n8n, no un objeto inventado) y
-// se propaga a cada item sin pérdida.
+// El INSERT del Nodo 5 devuelve solo el id (RETURNING id), sin los campos
+// de los hallazgos. Por eso el id se recupera por nombre de nodo, y los
+// hallazgos se leen del Nodo 3 ("Parsear XML Nmap"). Es un mecanismo
+// nativo de n8n que no depende de que los datos "viajen solos" entre
+// nodos. Así el scan_id se propaga a cada item sin pérdida.
 
 const scanId = $('Insert Scan History').first().json.id;
 const findings = $('Parsear XML Nmap').all();

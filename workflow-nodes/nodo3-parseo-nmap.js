@@ -13,7 +13,7 @@ for (const item of $input.all()) {
   const rawXml = item.json.stdout;
 
   if (!rawXml) {
-    throw new Error('El item no contiene stdout con el XML de Nmap. Verificar el nodo Execute Command anterior.');
+    throw new Error('El item no contiene stdout con el XML de Nmap. Verificar el nodo "Ejecutar Escaneo Nmap" anterior.');
   }
 
   let parsed;

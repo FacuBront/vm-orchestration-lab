@@ -17,7 +17,7 @@
 //    explicitCharkey por defecto), el texto queda bajo la clave "_", no
 //    directamente en r.host[0] como asumía el mock.
 //
-// Decisión de diseño (confirmada explícitamente con el usuario, 22/08/2026):
+// Decisión de diseño (22/08/2026, tras verificar el comportamiento real de GVM):
 // como un mismo host:puerto puede tener MUCHOS hallazgos reales de GVM (se
 // vio un caso real: 42 hallazgos distintos en el puerto 80 de target1), no
 // alcanza con "actualizar" la única fila que dejó Nmap para ese puerto sin
@@ -117,7 +117,7 @@ for (const item of $input.all()) {
     // formato normal "80/tcp"; pero también aparece "general/tcp",
     // "general/icmp", "general/CPE-T" para hallazgos a nivel de host/SO,
     // no atados a un puerto real (ej. detección de sistema operativo).
-    // HALLAZGO real (22/08/2026): Number("general") da NaN, que al
+    // Caso real (22/08/2026): Number("general") da NaN, que al
     // serializarse a JSON se convierte en null silenciosamente, y ese null
     // terminaba llegando a Postgres como el TEXTO "null" en vez de un NULL
     // real, rompiendo el INSERT en la columna entera port. Se detecta
@@ -165,3 +165,4 @@ for (const item of $input.all()) {
 }
 
 return results;
+

@@ -36,17 +36,29 @@ vulnerabilidades reales y conocidas, con evidencia real documentada en
 ## Nota metodológica
 
 El pipeline corre Nmap (reconocimiento de servicio/versión) y GVM real (correlación contra CVEs
-conocidos) en la misma ejecución. Los hallazgos de Nmap quedan como fila base por host:puerto;
-cada CVE real que GVM encuentra para ese host:puerto se inserta como fila adicional (`cve_id`,
-`severity_score`, `severity_label`, `description`, `solution` poblados) — ver la decisión de
-diseño documentada en `gvm-integration/hallazgo-estructura-real-get-reports.md`.
+conocidos) en la misma ejecución. Los hallazgos de Nmap quedan como fila base por host:puerto
+(3 filas en el laboratorio). GVM devuelve 79 resultados por corrida: el nodo de parseo descarta
+los 22 de categoría Log, que son informativos, y conserva 57 accionables. Los 40 accionables sin CVE
+asociado se guardan como una fila cada uno (`cve_id` nulo). Los 17 que documentan uno o más CVE se
+expanden en una fila por CVE (54 filas, con `cve_id`, `severity_score`, `severity_label`,
+`description` y `solution` poblados). El resultado es 94 filas de GVM más 3 de Nmap, es decir 97
+filas por corrida.
+
+La evidencia de cada corrida está en `evidencia/gvm-diez-corridas.md`, y la decisión de diseño en
+`gvm-integration/hallazgo-estructura-real-get-reports.md`.
+
+## Desarrollo asistido por IA
+
+El laboratorio se desarrolló con la asistencia de Claude Code, como declara el capítulo de
+consideraciones éticas de la tesis. `docs/RUNBOOK-fase-2d-gvm.md` es una guía que se escribió para que
+una sesión de Claude Code pudiera repetir la integración de GVM en otra máquina, y se conserva como
+artefacto de ese proceso. Todo lo que documenta se ejecutó y se verificó antes de darse por bueno.
 
 ## Arquitectura
 
 Todo el laboratorio corre en contenedores Docker sobre una única red bridge personalizada
-(`labnet`, `172.28.0.0/24`), lo que evita el problema central del proyecto anterior (un
-contenedor intentando resolver `localhost` para alcanzar un servicio que en realidad vive en el
-host). Cada servicio se referencia por su nombre de servicio Docker, no por IP ni por
+(`labnet`, `172.28.0.0/24`), lo que evita que un contenedor intente resolver
+`localhost` para alcanzar un servicio que en realidad vive en el host. Cada servicio se referencia por su nombre de servicio Docker, no por IP ni por
 `localhost`. El motor de evaluación (GVM/Greenbone) se despliega desde un archivo de composición
 aparte (`docker-compose.gvm.yml`); de sus ~19 contenedores, solo `ospd-openvas` —el motor de
 escaneo— se conecta también a `labnet`, con IP estática, porque es el único que necesita alcanzar

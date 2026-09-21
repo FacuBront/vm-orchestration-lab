@@ -7,9 +7,12 @@ idénticas, y si la cantidad de hallazgos se mantiene estable. La explicación d
 espera esa variación está en la sección 5 del runbook.
 
 Datos crudos, tomados directamente de `scan_history` y de los timestamps reales del escaneo
-GVM (no estimados ni redondeados).
+GVM (no estimados ni redondeados). Inicio, fin y duración corresponden al escaneo de GVM: no
+incluyen el resto del pipeline. La duración de punta a punta se mide en la versión de 27 nodos y se
+documenta en el capítulo 13 de la tesis. La cadena de conteo de cada corrida (79 → 57 → 94 → 97) está
+en `evidencia/gvm-diez-corridas.md`.
 
-| # | scan_id | Inicio | Fin | Duración total | Hallazgos totales | Con CVE | Fallos/reintentos |
+| # | scan_id | Inicio | Fin | Duración del escaneo de GVM | Hallazgos totales | CVE únicos | Fallos/reintentos |
 |---|---------|--------|-----|-----------------|--------------------|---------| --- |
 | 1 | 7 | 12:05:59 | 12:19:32 | 13m 33s | 97 | 54 | Ninguno |
 | 2 | 8 | 12:20:29 | 12:33:46 | 13m 17s | 97 | 54 | Ninguno |
@@ -28,7 +31,7 @@ Protocolo completo, 10/10 corridas exitosas, sin fallos ni reintentos en ninguna
 consecutivas entre las 12:05 y las 14:36 del 24/08/2026, en la misma máquina, sin cambios en
 `target1` entre corridas.
 
-**Duración total (min: seg → segundos):**
+**Duración del escaneo de GVM (min: seg → segundos):**
 
 | Corrida | Duración | Segundos |
 |---|---|---|
@@ -46,7 +49,7 @@ consecutivas entre las 12:05 y las 14:36 del 24/08/2026, en la misma máquina, s
 - **Promedio:** 837,1 s ≈ **13m 57s**
 - **Mínimo:** 797 s (corrida 2, 13m 17s)
 - **Máximo:** 860 s (corrida 6, 14m 20s)
-- **Rango de variación:** 63 s (~7,7% respecto del promedio) — confirma con evidencia real lo que
+- **Rango de variación:** 63 s (~7,5% respecto del promedio) — confirma con evidencia real lo que
   anticipaba la sección 5 del runbook: el tiempo de un escaneo GVM real varía entre corridas
   idénticas (a diferencia de la etapa solo-Nmap, donde no había nada que medir). La variación acá
   es moderada y consistente, sin ningún outlier extremo — buena señal de estabilidad del entorno.

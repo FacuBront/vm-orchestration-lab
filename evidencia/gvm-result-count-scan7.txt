@@ -1,0 +1,14 @@
+Extracto literal de la respuesta de GVM (GMP get_reports) para la corrida scan_id 7.
+Consulta: la misma que ejecuta el nodo 20 del workflow (details='1',
+filter='apply_overrides=0 min_qod=0 first=1 rows=-1'). Consultado en modo solo lectura el 21/09/2026.
+
+report_id : f382d9f8-3555-4f3d-a0cc-056a51327157
+task      : ad1ccfbd-fce3-442a-ae92-eccdf0693acc (01-scan-target1-7)
+scan_end  : 2026-08-24T15:19:18Z
+filtro    : apply_overrides=0 min_qod=0 first=1 rows=1000 sort=name
+
+Elemento <result_count> sin modificar (79 resultados; 79 = 11 + 14 + 27 + 5 + 22 en las
+categorias Critical, High, Medium, Low y Log; hole, warning e info son nombres obsoletos de
+las mismas categorias y no suman aparte):
+
+<result_count>79<full>79</full><filtered>79</filtered><critical><full>11</full><filtered>11</filtered></critical><hole deprecated='1'><full>14</full><filtered>14</filtered></hole><high><full>14</full><filtered>14</filtered></high><info deprecated='1'><full>5</full><filtered>5</filtered></info><low><full>5</full><filtered>5</filtered></low><log><full>22</full><filtered>22</filtered></log><warning deprecated='1'><full>27</full><filtered>27</filtered></warning><medium><full>27</full><filtered>27</filtered></medium><false_positive><full>0</full><filtered>0</filtered></false_positive></result_count>

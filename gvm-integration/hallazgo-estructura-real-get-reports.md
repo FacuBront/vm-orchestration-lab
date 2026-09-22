@@ -1,7 +1,7 @@
 # Hallazgo: estructura real de `get_reports` vs. lo asumido en el mock
 
 **Fecha:** 21/08/2026. Primer escaneo real de GVM contra `target1` (Fase 2d), tras corregir el
-problema del `port_list` UDP (ver commits/memoria de la sesión). Resultado guardado íntegro en
+problema del `port_list` UDP. Resultado guardado íntegro en
 `reporte-real-target1-2026-08-21.xml` (455 KB, 79 resultados totales / 26 con QoD ≥ 70).
 
 ## Lo que `gvm-integration/README.md` y el mock asumían (sin tener GVM instalado)
@@ -83,3 +83,19 @@ de diseño (priorizar no perder hallazgos graves), no como un descuido — ver e
 Alcances y Limitaciones de la tesis para la redacción formal de esta decisión.
 
 **Confirmado con el usuario:**  [La fecha fue 21/08/2026]
+
+## Actualización (verificada el 22/09/2026 contra las corridas del protocolo, 24/08/2026)
+
+El reporte del 21/08 usado para este hallazgo tenía `<cves><count>0</count>` y ningún NVT con un
+`<ref type="cve">` en su bloque `<refs>` (ver el ejemplo de arriba: el comentario "refs trae
+cert-bund/dfn-cert, NO trae los CVE acá tampoco" describe exactamente ese reporte). La conclusión
+"no existe la etiqueta `<cve>`, los CVE solo viajan en `insight`" era correcta para esa evidencia.
+
+Los reportes de las diez corridas del protocolo (`scan_id` 7 a 16, 24/08/2026), publicados en
+`evidencia/reportes-gvm/`, muestran otra cosa: 51 de los 57 resultados accionables sí traen uno o
+más `<ref type="cve">` en `<refs>` (92 CVE distintos), consistente en las diez corridas. El feed de
+vulnerabilidades de gvmd se actualizó entre el 21/08 y el 24/08. El nodo 21 sigue extrayendo los
+CVE solo de `insight`, con regex, y por eso persiste 54 CVE únicos, no 92 — no lee esa referencia
+estructurada. El detalle completo está en `evidencia/gvm-diez-corridas.md` y en el capítulo 8 y la
+Discusión de la tesis. No se modificó el nodo 21 para esta corrección: se documentó la limitación,
+como trabajo futuro queda re-parsear `<refs>` en vez de (o además de) `insight`.

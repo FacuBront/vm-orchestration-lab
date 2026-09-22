@@ -38,13 +38,20 @@ vulnerabilidades reales y conocidas, con evidencia real documentada en
 El pipeline corre Nmap (reconocimiento de servicio/versión) y GVM real (correlación contra CVEs
 conocidos) en la misma ejecución. Los hallazgos de Nmap quedan como fila base por host:puerto
 (3 filas en el laboratorio). GVM devuelve 79 resultados por corrida: el nodo de parseo descarta
-los 22 de categoría Log, que son informativos, y conserva 57 accionables. Los 40 accionables sin CVE
-asociado se guardan como una fila cada uno (`cve_id` nulo). Los 17 que documentan uno o más CVE se
-expanden en una fila por CVE (54 filas, con `cve_id`, `severity_score`, `severity_label`,
-`description` y `solution` poblados). El resultado es 94 filas de GVM más 3 de Nmap, es decir 97
-filas por corrida.
+los 22 de categoría Log, que son informativos, y conserva 57 accionables.
 
-La evidencia de cada corrida está en `evidencia/gvm-diez-corridas.md`, y la decisión de diseño en
+El nodo de parseo extrae los CVE del texto libre del campo `insight` de cada resultado, con una
+expresión regular, no de las referencias estructuradas `<ref type="cve">` que trae `<refs>` (esa
+estructura no existía en el reporte del 21/08 contra el que se diseñó el nodo; el feed de gvmd se
+actualizó después). Los 17 accionables donde encuentra un CVE en `insight` se expanden en una fila
+por CVE (54 filas, con `cve_id`, `severity_score`, `severity_label`, `description` y `solution`
+poblados). Los 40 restantes se guardan como una fila cada uno, con `cve_id` nulo. De esos 40, 34
+tienen uno o más CVE en las referencias estructuradas de GVM que el nodo no lee (ver
+`evidencia/gvm-diez-corridas.md`); solo 6 accionables no tienen ningún CVE, ni en insight ni en
+refs. El resultado es 94 filas de GVM más 3 de Nmap, es decir 97 filas por corrida.
+
+La evidencia de cada corrida, incluido el detalle de esta limitación (92 CVE en refs, 54
+persistidos), está en `evidencia/gvm-diez-corridas.md`, y la decisión de diseño original en
 `gvm-integration/hallazgo-estructura-real-get-reports.md`.
 
 ## Desarrollo asistido por IA

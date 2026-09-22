@@ -13,6 +13,10 @@
 //   node evidencia/recalculo-nodo21.js evidencia/reportes-gvm
 //
 // Cada archivo puede contener la respuesta completa de gvm-cli, tal como la recibe el nodo.
+//
+// Este script lee workflow/vm-pipeline-lab-apache.json del árbol de trabajo, no de un commit
+// fijo. A la fecha de evidencia/gvm-diez-corridas.md ese archivo coincide con el commit b2eeaff
+// citado en el Anexo B de la tesis (sin cambios desde entonces).
 
 const fs = require('fs');
 const path = require('path');

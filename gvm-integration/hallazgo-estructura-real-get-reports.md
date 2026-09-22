@@ -92,10 +92,15 @@ cert-bund/dfn-cert, NO trae los CVE acá tampoco" describe exactamente ese repor
 "no existe la etiqueta `<cve>`, los CVE solo viajan en `insight`" era correcta para esa evidencia.
 
 Los reportes de las diez corridas del protocolo (`scan_id` 7 a 16, 24/08/2026), publicados en
-`evidencia/reportes-gvm/`, muestran otra cosa: 51 de los 57 resultados accionables sí traen uno o
-más `<ref type="cve">` en `<refs>` (92 CVE distintos), consistente en las diez corridas. El feed de
-vulnerabilidades de gvmd se actualizó entre el 21/08 y el 24/08. El nodo 21 sigue extrayendo los
-CVE solo de `insight`, con regex, y por eso persiste 54 CVE únicos, no 92 — no lee esa referencia
-estructurada. El detalle completo está en `evidencia/gvm-diez-corridas.md` y en el capítulo 8 y la
-Discusión de la tesis. No se modificó el nodo 21 para esta corrección: se documentó la limitación,
-como trabajo futuro queda re-parsear `<refs>` en vez de (o además de) `insight`.
+`evidencia/reportes-gvm/`, se consultaron en modo solo lectura el 21/09/2026 y muestran otra cosa:
+51 de los 57 resultados accionables sí traen uno o más `<ref type="cve">` en `<refs>` (92 CVE
+distintos), consistente en las diez corridas. Lo mismo se ve en la corrida de verificación del
+01/09/2026 (Figura B.5 de la tesis). No hay un artefacto publicado que muestre qué exponía GVM el
+24/08 mismo: el reporte del 21/08 no trae ningún `<ref type="cve">`, pero sí 349 referencias
+`cert-bund` y 680 `dfn-cert`, así que no es un reporte "con menos referencias" en general. Que el
+feed se haya actualizado entre el 21/08 y el 24/08 es una hipótesis razonable, no un hecho
+verificado con evidencia propia. El nodo 21 sigue extrayendo los CVE solo de `insight`, con regex,
+y por eso persiste 54 CVE únicos, no 92 — no lee esa referencia estructurada. El detalle completo
+está en `evidencia/gvm-diez-corridas.md` y en el capítulo 8 y la Discusión de la tesis. No se
+modificó el nodo 21 para esta corrección: se documentó la limitación, como trabajo futuro queda
+re-parsear `<refs>` en vez de (o además de) `insight`.

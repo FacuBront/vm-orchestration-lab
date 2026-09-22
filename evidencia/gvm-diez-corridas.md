@@ -51,9 +51,12 @@ Cada resultado de GVM trae, dentro de `<nvt>`, un bloque `<refs>` con elementos
 `<ref type="cve" id="CVE-…"/>`. El nodo 21 no lee ese bloque: extrae los CVE con una expresión
 regular sobre el texto libre del campo `insight` de `<tags>`. En el reporte del 21/08/2026 contra
 el que se diseñó el nodo (`gvm-integration/reporte-real-target1-2026-08-21.xml`), ningún NVT traía
-un `<ref type="cve">`, así que la decisión de leer solo `insight` no perdía nada en ese momento. El
-feed de vulnerabilidades de gvmd se actualizó después: en las diez corridas del protocolo
-(24/08/2026), sí trae esas referencias.
+un `<ref type="cve">`, así que la decisión de leer solo `insight` no perdía nada en ese momento. Ese
+mismo reporte sí trae 349 referencias `cert-bund` y 680 `dfn-cert` — el patrón que falta no es "menos
+referencias en general", sino específicamente las de tipo `cve`, `url` y `cisa`. Los reportes
+consultados el 21/09/2026 (y ya el 01/09/2026, según la corrida de verificación scan_id 23) sí traen
+esas referencias. Que el feed de gvmd se haya actualizado entre el 21/08 y el 24/08 es una hipótesis
+razonable, pero ningún artefacto publicado prueba qué exponía GVM ese día puntual.
 
 Verificado el 22/09/2026 sobre los diez reportes publicados en `evidencia/reportes-gvm/`, idéntico
 en las diez corridas:
@@ -64,10 +67,22 @@ en las diez corridas:
 | Accionables con CVE en el texto `insight` (los que persiste el pipeline) | 17 de 57 |
 | CVE distintos en `<refs>` de los accionables | 92 |
 | CVE distintos que persiste el pipeline (desde `insight`) | 54 |
-| CVE en `<refs>` que no llegan a la base | 39 (42 %) |
+| CVE en ambos conjuntos (`<refs>` e `insight`) | 53 |
+| CVE solo en `insight`, sin referencia estructurada equivalente | 1 (CVE-2023-44487) |
+| CVE en `<refs>` que no llegan a la base | 39 (42,4 %) |
 | Filas con `cve_id` nulo cuyo resultado sí tiene CVE en `<refs>` | 34 de 40 |
 | Accionables sin ningún CVE (ni en `insight` ni en `<refs>`) | 6 |
 | Filas de GVM si se expandiera por `<refs>` en vez de por `insight` | 99 (93 con CVE, 6 sin CVE) |
+
+La fila de las 99 se reproduce con la opción `--refs` de `evidencia/recalculo-nodo21.js` (cuenta
+directamente sobre el XML, sin ejecutar el código del nodo 21, que no lee `<refs>`):
+
+```
+node evidencia/recalculo-nodo21.js --refs evidencia/reportes-gvm
+```
+
+Da 57 accionables, 51 con CVE en `<refs>` y 6 sin él, 99 filas y 92 CVE únicos en las diez corridas,
+sin excepción.
 
 El elemento `<cves><count>` del reporte (94, visible en la Figura B.5 de la tesis) es el número de
 elementos `<ref type="cve">` que gvmd cuenta en todo el reporte, no de CVE distintos: hay 93 valores
@@ -78,7 +93,9 @@ insight.
 
 Esto no altera la cadena de conteo por filas (79 → 57 → 94 → 97), que cuenta resultados y CVE
 mencionados en `insight`, no en `<refs>`. Afecta a qué proporción de los CVE que GVM asocia
-realmente al objetivo queda persistida: 54 de 92 en los accionables, un 59 %.
+realmente al objetivo queda persistida: 53 de 92 en los accionables, un 57,6 % (no 54 de 92: ese 54
+incluye a CVE-2023-44487, que persiste desde `insight` pero no tiene una referencia `<refs>`
+equivalente en este conjunto).
 
 ## Horas reales del escaneo de GVM (scan_start / scan_end)
 

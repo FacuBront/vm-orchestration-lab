@@ -14,6 +14,11 @@
 //
 // Cada archivo puede contener la respuesta completa de gvm-cli, tal como la recibe el nodo.
 //
+// Con --refs, en vez de ejecutar el código del nodo 21, cuenta las filas que resultarían de
+// expandir por <refs><ref type="cve"> en vez de por el texto insight (trabajo futuro 8 de la
+// tesis, cap. 15). No corre el código del nodo: es un conteo independiente sobre el mismo XML.
+//   node evidencia/recalculo-nodo21.js --refs evidencia/reportes-gvm
+//
 // Este script lee workflow/vm-pipeline-lab-apache.json del árbol de trabajo, no de un commit
 // fijo. A la fecha de evidencia/gvm-diez-corridas.md ese archivo coincide con el commit b2eeaff
 // citado en el Anexo B de la tesis (sin cambios desde entonces).
@@ -72,16 +77,65 @@ async function resumir(archivo, ejecutarNodo) {
   };
 }
 
+async function resumirRefs(archivo) {
+  const xml = leer(archivo).toString('utf8');
+  const doc = await parseStringPromise(xml, { explicitArray: true });
+  const informe = doc.get_reports_response.report[0].report[0];
+  const resultados = informe.results?.[0]?.result ?? [];
+  const accionables = resultados.filter((r) => (r.threat?.[0] ?? 'Log') !== 'Log');
+
+  let filasRefs = 0;
+  let conCve = 0;
+  let sinCve = 0;
+  const cveUnicos = new Set();
+
+  for (const r of accionables) {
+    const refs = r.nvt?.[0]?.refs?.[0]?.ref ?? [];
+    const cves = [...new Set(refs.filter((ref) => ref.$?.type === 'cve').map((ref) => ref.$.id))];
+    if (cves.length > 0) {
+      conCve += 1;
+      filasRefs += cves.length;
+      for (const c of cves) cveUnicos.add(c);
+    } else {
+      sinCve += 1;
+      filasRefs += 1;
+    }
+  }
+
+  return {
+    archivo: path.basename(archivo),
+    accionables: accionables.length,
+    con_cve_refs: conCve,
+    sin_cve_refs: sinCve,
+    filas_refs: filasRefs,
+    cve_unicos_refs: cveUnicos.size,
+  };
+}
+
 async function main() {
-  const archivos = process.argv.slice(2).flatMap((a) =>
-    fs.existsSync(a) && fs.statSync(a).isDirectory()
-      ? fs.readdirSync(a).filter((f) => /\.xml(\.gz)?$/.test(f)).sort().map((f) => path.join(a, f))
-      : [a],
-  );
+  const modoRefs = process.argv.includes('--refs');
+  const archivos = process.argv
+    .slice(2)
+    .filter((a) => a !== '--refs')
+    .flatMap((a) =>
+      fs.existsSync(a) && fs.statSync(a).isDirectory()
+        ? fs.readdirSync(a).filter((f) => /\.xml(\.gz)?$/.test(f)).sort().map((f) => path.join(a, f))
+        : [a],
+    );
   if (archivos.length === 0) {
-    console.error('Uso: node evidencia/recalculo-nodo21.js <reporte.xml|reporte.xml.gz> [...]');
+    console.error('Uso: node evidencia/recalculo-nodo21.js [--refs] <reporte.xml|reporte.xml.gz> [...]');
     process.exit(1);
   }
+
+  if (modoRefs) {
+    console.log(['archivo', 'accionables', 'con_cve_refs', 'sin_cve_refs', 'filas_refs', 'cve_unicos_refs'].join('\t'));
+    for (const a of archivos) {
+      const r = await resumirRefs(a);
+      console.log([r.archivo, r.accionables, r.con_cve_refs, r.sin_cve_refs, r.filas_refs, r.cve_unicos_refs].join('\t'));
+    }
+    return;
+  }
+
   const fn = new AsyncFunction('$input', '$', 'require', codigoNodo21());
   const nodo21 = (stdout) =>
     fn(

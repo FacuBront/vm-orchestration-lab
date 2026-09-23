@@ -1,0 +1,40 @@
+# -----------------------------------------------------------------------------
+# Frontend MVP: landing pública + panel de control (Flask + Jinja2 + Chart.js).
+#
+# Overlay aparte, con el mismo patrón que docker-compose.gvm.yml: no modifica
+# ningún servicio existente, solo agrega "frontend". Se levanta junto a los
+# otros dos archivos:
+#   docker compose -f docker-compose.yml -f docker-compose.gvm.yml \
+#     -f docker-compose.frontend.yml up -d --build frontend
+#
+# El frontend solo LEE: consulta PostgreSQL con SELECT parametrizados en una
+# sesión de solo lectura, lee los informes montados en solo lectura y dispara
+# escaneos llamando al Webhook del workflow copia
+# (workflow/vm-pipeline-lab-apache-webhook.json), nunca al original.
+# -----------------------------------------------------------------------------
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lab_frontend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?Definí DATABASE_URL en .env (ver .env.example)}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/lanzar-escaneo}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:?Definí FLASK_SECRET_KEY en .env (ver .env.example)}
+      - FRONTEND_ADMIN_USER=${FRONTEND_ADMIN_USER:?Definí FRONTEND_ADMIN_USER en .env (ver .env.example)}
+      - FRONTEND_ADMIN_PASSWORD=${FRONTEND_ADMIN_PASSWORD:?Definí FRONTEND_ADMIN_PASSWORD en .env (ver .env.example)}
+    volumes:
+      # Los informes que escribe n8n, en SOLO LECTURA: el frontend los lista,
+      # los renderiza y los ofrece para descargar, pero no puede tocarlos.
+      - ./reports:/app/reports:ro
+    networks:
+      labnet:
+        ipv4_address: 172.28.0.40

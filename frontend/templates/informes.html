@@ -1,0 +1,34 @@
+{% extends 'app_base.html' %}
+{% import '_macros.html' as m %}
+{% block titulo %}Informes · {{ PRODUCT_NAME }}{% endblock %}
+
+{% block contenido %}
+<h1 class="text-2xl font-bold tracking-tight text-white">Informes</h1>
+<p class="mt-1 text-sm text-slate-400">Informes técnicos generados automáticamente por el pipeline al final de cada escaneo, del más nuevo al más viejo.</p>
+
+<section class="mt-6 rounded-2xl border border-borde bg-superficie">
+  <ul class="divide-y divide-borde">
+    {% for i in informes %}
+    {% set scan_id = i.scan_id or por_archivo.get(i.archivo) %}
+    <li class="flex flex-col gap-3 px-5 py-4 hover:bg-elevada/60 sm:flex-row sm:items-center">
+      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-acento/10 text-acento ring-1 ring-acento/20">{{ m.icono('documento') }}</div>
+      <div class="min-w-0 flex-1">
+        <a href="{{ url_for('informe', archivo=i.archivo) }}" class="block truncate font-mono text-sm font-medium text-white hover:text-acento">{{ i.archivo }}</a>
+        <p class="mt-0.5 text-xs text-slate-500">
+          {{ i.fecha|fecha(true) }} · {{ i.kb }} KB
+          {% if scan_id %} · Escaneo <a href="{{ url_for('escaneo', scan_id=scan_id) }}" class="font-mono text-slate-300 hover:text-acento">#{{ scan_id }}</a>
+            {% if es_oficial(scan_id) %}<span class="ml-1 rounded bg-acento/10 px-1.5 py-0.5 text-[11px] font-medium text-acento">oficial</span>{% endif %}
+          {% endif %}
+        </p>
+      </div>
+      <div class="flex shrink-0 gap-2">
+        <a href="{{ url_for('informe', archivo=i.archivo) }}" class="rounded-lg border border-borde px-3 py-1.5 text-sm text-slate-200 hover:border-acento hover:text-acento">Ver</a>
+        <a href="{{ url_for('descargar_informe', archivo=i.archivo) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-borde px-3 py-1.5 text-sm text-slate-200 hover:border-acento hover:text-acento">{{ m.icono('descarga', 'w-4 h-4') }}.md</a>
+      </div>
+    </li>
+    {% else %}
+    <li class="px-5 py-10 text-center text-slate-500">Todavía no hay informes en ./reports.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

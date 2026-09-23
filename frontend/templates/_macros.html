@@ -1,0 +1,66 @@
+{# Íconos (trazos SVG inline, sin dependencias) y piezas reutilizables. #}
+
+{% macro icono(nombre, clase='w-5 h-5') -%}
+<svg class="{{ clase }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if nombre == 'escudo' -%}<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>
+{%- elif nombre == 'radar' -%}<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1"/>
+{%- elif nombre == 'bicho' -%}<rect x="8" y="7" width="8" height="12" rx="4"/><path d="M12 7V5M9 4l1.5 2M15 4l-1.5 2M4 12h4M16 12h4M5 17l3-1.5M19 17l-3-1.5M5 7l3 1.5M19 7l-3 1.5"/>
+{%- elif nombre == 'base' -%}<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>
+{%- elif nombre == 'documento' -%}<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2"/>
+{%- elif nombre == 'orquesta' -%}<circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 12h4l6-5M11 12l6 5"/>
+{%- elif nombre == 'contenedor' -%}<path d="M3 8l9-5 9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>
+{%- elif nombre == 'reloj' -%}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif nombre == 'persona' -%}<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>
+{%- elif nombre == 'balanza' -%}<path d="M12 3v18M6 21h12M5 7h14M5 7l-3 7a3 3 0 006 0L5 7zM19 7l-3 7a3 3 0 006 0l-3-7z"/>
+{%- elif nombre == 'ventana' -%}<path d="M3 12h4l3-8 4 16 3-8h4"/>
+{%- elif nombre == 'dinero' -%}<circle cx="12" cy="12" r="9"/><path d="M15 9a3 3 0 00-3-1.5c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2A3 3 0 019 15M12 6v1.5M12 16.5V18"/>
+{%- elif nombre == 'check' -%}<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>
+{%- elif nombre == 'flecha' -%}<path d="M5 12h14M13 6l6 6-6 6"/>
+{%- elif nombre == 'rayo' -%}<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>
+{%- elif nombre == 'panel' -%}<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+{%- elif nombre == 'salir' -%}<path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l5-5-5-5M15 12H3"/>
+{%- elif nombre == 'descarga' -%}<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>
+{%- elif nombre == 'externo' -%}<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>
+{%- elif nombre == 'lupa' -%}<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>
+{%- elif nombre == 'alerta' -%}<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/>
+{%- elif nombre == 'chevron' -%}<path d="M9 6l6 6-6 6"/>
+{%- elif nombre == 'volver' -%}<path d="M19 12H5M11 6l-6 6 6 6"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}
+
+{% macro badge_sev(sev) -%}
+{% set CLASE_SEV = {
+  'Crítica': 'bg-sev-critica/15 text-red-300 ring-sev-critica/40',
+  'Alta': 'bg-sev-alta/15 text-orange-300 ring-sev-alta/40',
+  'Media': 'bg-sev-media/10 text-yellow-200 ring-sev-media/40',
+  'Baja': 'bg-sev-baja/15 text-blue-300 ring-sev-baja/40',
+  'Ninguna': 'bg-slate-500/15 text-slate-300 ring-slate-500/40',
+} %}
+{% set PUNTO_SEV = {
+  'Crítica': 'bg-sev-critica', 'Alta': 'bg-sev-alta', 'Media': 'bg-sev-media',
+  'Baja': 'bg-sev-baja', 'Ninguna': 'bg-sev-ninguna',
+} %}
+<span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ CLASE_SEV.get(sev, CLASE_SEV['Ninguna']) }}">
+  <span class="h-1.5 w-1.5 rounded-full {{ PUNTO_SEV.get(sev, 'bg-sev-ninguna') }}"></span>{{ sev }}
+</span>
+{%- endmacro %}
+
+{% macro badge_estado(estado) -%}
+{% if estado == 'completed' %}
+<span class="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>Completado</span>
+{% elif estado == 'running' %}
+<span class="inline-flex items-center gap-1.5 rounded-md bg-acento/10 px-2 py-0.5 text-xs font-medium text-acento ring-1 ring-inset ring-acento/30"><span class="h-1.5 w-1.5 rounded-full bg-acento animate-pulse"></span>En curso</span>
+{% elif estado == 'failed' %}
+<span class="inline-flex items-center gap-1.5 rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300 ring-1 ring-inset ring-red-500/30"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>Falló</span>
+{% else %}
+<span class="inline-flex rounded-md bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-300 ring-1 ring-inset ring-slate-500/30">{{ estado }}</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro marca(tamano='text-lg') -%}
+<span class="inline-flex items-center gap-2 font-bold tracking-tight {{ tamano }} text-white">
+  <span class="grid h-8 w-8 place-items-center rounded-lg bg-acento/10 text-acento ring-1 ring-acento/30">{{ icono('escudo', 'w-5 h-5') }}</span>
+  {{ PRODUCT_NAME }}
+</span>
+{%- endmacro %}

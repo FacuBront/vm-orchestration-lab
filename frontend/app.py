@@ -229,9 +229,10 @@ def renderizar_markdown(texto):
     # Los informes incluyen texto de GVM: se neutraliza cualquier HTML crudo.
     texto = texto.replace('<', '&lt;')
     # El generador de informes anida listas con 2 espacios; Python-Markdown
-    # necesita 4 para reconocer el anidamiento.
+    # necesita 4 para reconocer el anidamiento. nl2br respeta los saltos de
+    # línea simples del encabezado (ID, objetivo, inicio, fin...).
     texto = re.sub(r'^( +)', lambda m: m.group(1) * 2, texto, flags=re.M)
-    html = markdown.markdown(texto, extensions=['tables', 'sane_lists', 'fenced_code'])
+    html = markdown.markdown(texto, extensions=['tables', 'sane_lists', 'fenced_code', 'nl2br'])
     html = re.sub(r'(?<![\w/-])(CVE-\d{4}-\d{4,})',
                   r'<a href="https://nvd.nist.gov/vuln/detail/\1" target="_blank" rel="noopener">\1</a>',
                   html)

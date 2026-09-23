@@ -1,0 +1,125 @@
+{% extends 'app_base.html' %}
+{% import '_macros.html' as m %}
+{% block titulo %}Panel · {{ PRODUCT_NAME }}{% endblock %}
+
+{% block contenido %}
+<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <div>
+    <h1 class="text-2xl font-bold tracking-tight text-white">Panel de control</h1>
+    <p class="mt-1 text-sm text-slate-400">Datos en vivo de PostgreSQL.
+      {% if ultimo %}Las métricas corresponden al último escaneo completado (#{{ ultimo.id }}).{% endif %}</p>
+  </div>
+  <form method="post" action="{{ url_for('lanzar_escaneo') }}" onsubmit="this.querySelector('button').disabled = true; this.querySelector('span').textContent = 'Contactando al orquestador…';">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button class="boton-lanzar inline-flex items-center gap-2 rounded-xl bg-acento px-6 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-acento/25 hover:bg-acento-fuerte disabled:cursor-wait disabled:opacity-70">
+      {{ m.icono('rayo', 'w-5 h-5') }}<span>Lanzar escaneo</span>
+    </button>
+  </form>
+</div>
+
+{# ---------------- KPIs ---------------- #}
+<section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Indicadores">
+  {% set kpis = [
+    ('Escaneos registrados', total_escaneos, total_oficiales ~ ' corridas oficiales de la tesis', 'text-white'),
+    ('Último escaneo', ultimo.started_at|fecha if ultimo else '—', ('Escaneo #' ~ ultimo.id ~ ' · ' ~ ultimo.target_range) if ultimo else 'Sin escaneos completados', 'text-white'),
+    ('Hallazgos', resumen.hallazgos if resumen else '—', 'del último escaneo', 'text-white'),
+    ('CVE únicos', resumen.cves if resumen else '—', 'del último escaneo', 'text-white'),
+    ('Críticas + Altas', resumen.criticas_altas if resumen else '—', ((severidad['Crítica'] ~ ' críticas · ' ~ severidad['Alta'] ~ ' altas') if severidad else 'del último escaneo'), 'text-orange-300'),
+  ] %}
+  {% for titulo, valor, detalle, color in kpis %}
+  <div class="rounded-2xl border border-borde bg-superficie p-5">
+    <p class="text-sm font-medium text-slate-400">{{ titulo }}</p>
+    <p class="mt-2 font-mono {{ 'text-xl' if loop.index == 2 else 'text-4xl' }} font-semibold tracking-tight {{ color }}">{{ valor }}</p>
+    <p class="mt-2 text-xs text-slate-500">{{ detalle }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------------- Gráficos ---------------- #}
+<section class="mt-6 grid gap-4 lg:grid-cols-5">
+  <div class="rounded-2xl border border-borde bg-superficie p-5 lg:col-span-2">
+    <h2 class="font-semibold text-white">Hallazgos por severidad</h2>
+    <p class="text-xs text-slate-500">{% if ultimo %}Escaneo #{{ ultimo.id }}{% else %}Sin datos{% endif %}</p>
+    <div class="relative mt-4 h-64"><canvas id="grafico-severidad" role="img" aria-label="Hallazgos por severidad del último escaneo"></canvas></div>
+    {% if severidad %}
+    <table class="sr-only"><caption>Hallazgos por severidad</caption>
+      {% for sev in SEVERIDADES %}<tr><th>{{ sev }}</th><td>{{ severidad[sev] }}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+  </div>
+  <div class="rounded-2xl border border-borde bg-superficie p-5 lg:col-span-3">
+    <h2 class="font-semibold text-white">Hallazgos por escaneo</h2>
+    <p class="text-xs text-slate-500">Mismo objetivo, mismo resultado: una línea plana muestra la estabilidad del pipeline.</p>
+    <div class="relative mt-4 h-64"><canvas id="grafico-tendencia" role="img" aria-label="Hallazgos por escaneo a lo largo del tiempo"></canvas></div>
+  </div>
+</section>
+
+{# ---------------- Historial ---------------- #}
+<section class="mt-6 rounded-2xl border border-borde bg-superficie">
+  <div class="flex flex-col gap-3 border-b border-borde px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h2 class="font-semibold text-white">Historial de escaneos</h2>
+      <p class="text-xs text-slate-500">Las corridas #{{ 7 }} a #{{ 16 }} son las oficiales de la tesis; las anteriores fueron pruebas de desarrollo.</p>
+    </div>
+    <a href="{{ url_for('panel', desde7='0' if solo_oficiales else '1') }}" class="inline-flex items-center gap-3 text-sm text-slate-300" role="switch" aria-checked="{{ 'true' if solo_oficiales else 'false' }}">
+      <span class="relative inline-flex h-6 w-11 items-center rounded-full transition {{ 'bg-acento' if solo_oficiales else 'bg-slate-700' }}">
+        <span class="inline-block h-5 w-5 transform rounded-full bg-white transition {{ 'translate-x-5' if solo_oficiales else 'translate-x-0.5' }}"></span>
+      </span>
+      Solo desde la corrida #7
+    </a>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="text-xs uppercase tracking-wider text-slate-500">
+        <tr>
+          <th class="px-5 py-3 font-medium">ID</th>
+          <th class="px-5 py-3 font-medium">Objetivo</th>
+          <th class="px-5 py-3 font-medium">Inicio</th>
+          <th class="px-5 py-3 font-medium">Estado</th>
+          <th class="px-5 py-3 text-right font-medium">Hallazgos</th>
+          <th class="px-5 py-3 font-medium">Informe</th>
+          <th class="px-5 py-3"><span class="sr-only">Detalle</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-borde">
+        {% for e in escaneos %}
+        {% set prueba = e.id < 7 %}
+        <tr class="group hover:bg-elevada/60 {{ 'opacity-50' if prueba }}">
+          <td class="whitespace-nowrap px-5 py-3 font-mono text-white">
+            #{{ e.id }}
+            {% if prueba %}<span class="ml-2 rounded bg-slate-700/60 px-1.5 py-0.5 font-sans text-[11px] font-medium text-slate-300">prueba</span>
+            {% elif es_oficial(e.id) %}<span class="ml-2 rounded bg-acento/10 px-1.5 py-0.5 font-sans text-[11px] font-medium text-acento">oficial</span>{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-5 py-3 font-mono text-slate-300">{{ e.target_range }}</td>
+          <td class="whitespace-nowrap px-5 py-3 text-slate-300">{{ e.started_at|fecha }}</td>
+          <td class="whitespace-nowrap px-5 py-3">{{ m.badge_estado(e.status) }}</td>
+          <td class="whitespace-nowrap px-5 py-3 text-right font-mono text-white">{{ e.hallazgos }}</td>
+          <td class="whitespace-nowrap px-5 py-3">
+            {% if e.informe %}<a href="{{ url_for('informe', archivo=e.informe) }}" class="inline-flex items-center gap-1.5 text-slate-300 hover:text-acento">{{ m.icono('documento', 'w-4 h-4') }}Ver</a>
+            {% else %}<span class="text-slate-600">—</span>{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-5 py-3 text-right">
+            <a href="{{ url_for('escaneo', scan_id=e.id) }}" class="inline-flex items-center gap-1 font-medium text-acento hover:underline">Ver detalle {{ m.icono('chevron', 'w-4 h-4') }}</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Todavía no hay escaneos registrados. Lanzá el primero.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script id="datos-severidad" type="application/json">{{ ((severidad.items()|list) if severidad else none)|tojson }}</script>
+<script id="datos-tendencia" type="application/json">{{ tendencia|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='graficos.js') }}"></script>
+<script>
+  const sev = JSON.parse(document.getElementById('datos-severidad').textContent);
+  const ten = JSON.parse(document.getElementById('datos-tendencia').textContent);
+  if (sev) Graficos.severidad(document.getElementById('grafico-severidad'), sev);
+  Graficos.tendencia(document.getElementById('grafico-tendencia'), ten);
+</script>
+{% endblock %}

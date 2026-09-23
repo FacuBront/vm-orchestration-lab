@@ -1,0 +1,22 @@
+{% extends 'app_base.html' %}
+{% import '_macros.html' as m %}
+{% block titulo %}{{ informe.archivo }} · {{ PRODUCT_NAME }}{% endblock %}
+
+{% block contenido %}
+<a href="{{ url_for('informes') }}" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white">{{ m.icono('volver', 'w-4 h-4') }}Volver a informes</a>
+
+<div class="mt-4 flex flex-col gap-4 rounded-2xl border border-borde bg-superficie px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+  <div class="min-w-0">
+    <p class="truncate font-mono text-sm font-medium text-white">{{ informe.archivo }}</p>
+    <p class="mt-0.5 text-xs text-slate-500">Generado el {{ informe.fecha|fecha(true) }} · {{ informe.kb }} KB
+      {% if scan_id %} · Escaneo <a href="{{ url_for('escaneo', scan_id=scan_id) }}" class="font-mono text-slate-300 hover:text-acento">#{{ scan_id }}</a>{% endif %}</p>
+  </div>
+  <a href="{{ url_for('descargar_informe', archivo=informe.archivo) }}" class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-acento-fuerte">
+    {{ m.icono('descarga', 'w-4 h-4') }}Descargar .md
+  </a>
+</div>
+
+<article class="informe mt-6 rounded-2xl border border-borde bg-superficie px-6 py-8 sm:px-10">
+  {{ contenido }}
+</article>
+{% endblock %}

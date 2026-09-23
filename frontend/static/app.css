@@ -1,0 +1,53 @@
+/* Estilos que no cubre Tailwind: fondo del hero y tipografía del informe. */
+
+html { scroll-behavior: smooth; }
+
+.hero-grilla {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 30% 20%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 30% 20%, black 20%, transparent 70%);
+}
+
+.hero-halo {
+  background:
+    radial-gradient(600px circle at 15% 10%, rgba(45, 212, 191, 0.14), transparent 60%),
+    radial-gradient(500px circle at 85% 30%, rgba(220, 38, 38, 0.08), transparent 60%);
+}
+
+@media (min-width: 1024px) {
+  .paso:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 2.9rem;
+    right: -1.05rem;
+    width: 0.9rem;
+    height: 2px;
+    background: #2dd4bf;
+    opacity: 0.5;
+  }
+}
+
+/* Informe Markdown renderizado */
+.informe { color: #cbd5e1; line-height: 1.7; }
+.informe h1 { font-size: 1.875rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; margin-bottom: 1.25rem; }
+.informe h2 { font-size: 1.35rem; font-weight: 700; color: #fff; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1f2a3a; }
+.informe h3 { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; margin: 2rem 0 0.75rem; }
+.informe p { margin: 0.6rem 0; }
+.informe strong { color: #f8fafc; }
+.informe a { color: #2dd4bf; text-decoration: underline; text-underline-offset: 2px; }
+.informe code { font-family: "JetBrains Mono", monospace; font-size: 0.85em; background: #0a0e14; border: 1px solid #1f2a3a; border-radius: 0.3rem; padding: 0.1rem 0.35rem; }
+.informe pre { background: #0a0e14; border: 1px solid #1f2a3a; border-radius: 0.6rem; padding: 1rem; overflow-x: auto; }
+.informe ul { list-style: disc; padding-left: 1.4rem; margin: 0.5rem 0; }
+.informe ul ul { list-style: circle; margin: 0.2rem 0 0.6rem; }
+.informe li { margin: 0.2rem 0; }
+.informe blockquote { border-left: 3px solid #fb923c; background: rgba(251, 146, 60, 0.06); padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 0.4rem 0.4rem 0; }
+.informe hr { border-color: #1f2a3a; margin: 2rem 0; }
+.informe table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; display: block; overflow-x: auto; }
+.informe th { text-align: left; font-weight: 600; color: #f1f5f9; background: #161f2e; }
+.informe th, .informe td { border: 1px solid #1f2a3a; padding: 0.5rem 0.75rem; }
+.informe tr:nth-child(even) td { background: rgba(22, 31, 46, 0.5); }
+
+.fila-hallazgo[aria-expanded="true"] .chevron { transform: rotate(90deg); }

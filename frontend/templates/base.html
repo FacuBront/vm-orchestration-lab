@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es-AR" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}{{ PRODUCT_NAME }}{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='escudo.svg') }}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            fondo: '#0a0e14',
+            superficie: '#111827',
+            elevada: '#161f2e',
+            borde: '#1f2a3a',
+            acento: { DEFAULT: '#2dd4bf', fuerte: '#14b8a6', tenue: '#134e4a' },
+            sev: {
+              critica: '#dc2626', alta: '#fb923c', media: '#fde047',
+              baja: '#60a5fa', ninguna: '#9ca3af',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-full bg-fondo text-slate-200 font-sans antialiased">
+  {% block cuerpo %}{% endblock %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

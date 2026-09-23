@@ -177,9 +177,11 @@ leer o descargar los informes. Vive en `frontend/` y se levanta con un overlay a
    `GMP Insertar Hallazgos`, `Actualizar Fin Real Scan History` y
    `Consultar Hallazgos del Escaneo`) y asignales la credencial **Postgres** del paso 6 de la
    puesta en marcha.
-3. Guardá y **activá** el workflow con el interruptor *Active*. Solo un workflow activo responde en
-   la URL de producción `/webhook/lanzar-escaneo`; si no está activo, el panel muestra
-   "No se pudo contactar al orquestador" en vez de lanzar el escaneo.
+3. Guardá y **publicá** el workflow con el botón **Publish** de arriba a la derecha (en n8n 2.x
+   reemplaza al viejo interruptor *Active*); queda con la marca **Published**. Solo un workflow
+   publicado responde en la URL de producción `/webhook/lanzar-escaneo`; si no lo está, el panel
+   muestra "No se pudo contactar al orquestador" en vez de lanzar el escaneo. Para comprobarlo sin
+   lanzar un escaneo: `docker exec lab_n8n n8n list:workflow --active=true` tiene que listarlo.
 4. Desde el panel, **"Lanzar escaneo"**. La pantalla de escaneo en curso consulta el estado cada 5
    segundos y muestra "Ver resultados" cuando `scan_history.status` pasa a `completed`.
 

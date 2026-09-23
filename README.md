@@ -137,6 +137,58 @@ alcanzar `target1` por red. El resto del stack de GVM no tiene visibilidad sobre
 
 El informe generado queda en `./reports/`, visible desde el host sin entrar al contenedor.
 
+## Frontend MVP
+
+Una landing pública y un panel de control web (Flask + Jinja2 + Chart.js) para operar el
+laboratorio sin abrir n8n: lanzar un escaneo, seguirlo en vivo, ver los hallazgos con filtros y
+leer o descargar los informes. Vive en `frontend/` y se levanta con un overlay aparte,
+`docker-compose.frontend.yml`, sin modificar ningún servicio existente.
+
+- **Solo lectura.** Consulta PostgreSQL únicamente con `SELECT` parametrizados, en sesiones con
+  `default_transaction_read_only=on`, y monta `./reports` en solo lectura. Todo número del panel
+  sale de la base en vivo; los hallazgos se cuentan con `count(*)` sobre `vulnerability_scans`, no
+  con `finding_count`.
+- **Dispara escaneos por Webhook**, contra una **copia** del workflow
+  (`workflow/vm-pipeline-lab-apache-webhook.json`). El workflow original queda intacto. La copia
+  solo cambia el disparador (Webhook `POST /webhook/lanzar-escaneo`, que responde 202 al
+  instante), marca `scan_history.status` como `running` al insertar y como `completed` al terminar
+  GVM, y agrega el id del escaneo al nombre del informe (`informe_scan-<id>_<fecha>.md`).
+
+### Cómo levantarlo
+
+1. Completá en `.env` las variables nuevas de `.env.example` (sección "Frontend MVP"):
+   `DATABASE_URL`, `N8N_WEBHOOK_URL`, `FLASK_SECRET_KEY`, `FRONTEND_ADMIN_USER` y
+   `FRONTEND_ADMIN_PASSWORD`.
+2. Construí y levantá el frontend junto al resto del stack:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.gvm.yml -f docker-compose.frontend.yml up -d --build frontend
+   ```
+3. Abrí `http://localhost:8000` (landing) e ingresá al panel con el usuario administrador.
+4. Opcional: para que el frontend use un rol propio de solo lectura en lugar de
+   `POSTGRES_APP_USER`, corré una vez `sql/manual/03_frontend_readonly.sql` (el comando está en el
+   encabezado del archivo) y apuntá `DATABASE_URL` a ese rol.
+
+### Cómo importar y activar el workflow con Webhook
+
+1. En n8n (`http://localhost:5678`): **Workflows → Import from File** y elegí
+   `workflow/vm-pipeline-lab-apache-webhook.json`. Se importa como un workflow nuevo,
+   "VM Pipeline - Lab Apache (Webhook MVP)", sin pisar el original.
+2. Abrí los nodos Postgres (`Insert Scan History`, `Insertar Hallazgos de Nmap`,
+   `GMP Insertar Hallazgos`, `Actualizar Fin Real Scan History` y
+   `Consultar Hallazgos del Escaneo`) y asignales la credencial **Postgres** del paso 6 de la
+   puesta en marcha.
+3. Guardá y **activá** el workflow con el interruptor *Active*. Solo un workflow activo responde en
+   la URL de producción `/webhook/lanzar-escaneo`; si no está activo, el panel muestra
+   "No se pudo contactar al orquestador" en vez de lanzar el escaneo.
+4. Desde el panel, **"Lanzar escaneo"**. La pantalla de escaneo en curso consulta el estado cada 5
+   segundos y muestra "Ver resultados" cuando `scan_history.status` pasa a `completed`.
+
+Las corridas oficiales de la tesis son los `scan_id` 7 a 16; en el panel, las anteriores se
+muestran atenuadas como "prueba". En las corridas hechas con el workflow original, `finished_at`
+no refleja la duración real del escaneo de GVM, por eso el panel no muestra duraciones. Los
+informes viejos, que no tienen el id en el nombre, se vinculan con su escaneo por el informe más
+cercano posterior a `finished_at`, dentro de una ventana de 20 minutos.
+
 ## Estructura del repositorio
 
 ```
